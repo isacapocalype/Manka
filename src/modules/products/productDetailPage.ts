@@ -1,0 +1,179 @@
+import type { PageRenderer } from '@/app/router';
+import { PRODUCT_STATUS_LABELS, PRODUCT_STATUS_TONES } from '@/app/labels';
+import {
+  calculateProductMarginAmount,
+  calculateProductMarginPercent,
+} from '@/core/calculations/productMath';
+import { formatBusinessDate, formatDateTime } from '@/core/utils/date';
+import { formatPercent, formatRupiah } from '@/core/utils/money';
+import { escapeHtml } from '@/components/ui/dom';
+import { icon, refreshIcons } from '@/components/ui/icons';
+import {
+  badge,
+  card,
+  confirmDialog,
+  dataTable,
+  emptyState,
+  kpiCard,
+  linkButton,
+  loadingBlock,
+  pageHeader,
+  showToast,
+} from '@/components/ui/ui';
+import { renderPageError } from '@/app/pageUtils';
+
+export const productDetailPage: PageRenderer = async (context) => {
+  const { root, services } = context;
+  const id = context.params.id ?? '';
+  root.innerHTML = loadingBlock('Memuat produk…');
+
+  try {
+    const [product, costs, prices] = await Promise.all([
+      services.productService.get(id),
+      services.productService.listCosts(id),
+      services.productService.listPrices(id),
+    ]);
+    if (context.signal.aborted) return;
+    context.setTitle(product.name);
+
+    const margin = calculateProductMarginPercent(product.price, product.currentCost);
+    const marginAmount = calculateProductMarginAmount(product.price, product.currentCost);
+
+    root.innerHTML = `
+      ${pageHeader({
+        eyebrow: 'Master produk',
+        title: product.name,
+        subtitle: `${product.sku}${product.category ? ` · ${product.category}` : ''}${product.variant ? ` · ${product.variant}` : ''}`,
+        actions: `
+          <a class="btn btn-secondary" href="#/products">${icon('arrow-left')}<span>Kembali</span></a>
+          ${linkButton(`/products/${product.id}/edit`, 'Ubah produk', 'btn btn-primary', 'pencil')}
+        `,
+      })}
+      <div class="detail-meta">
+        ${badge(PRODUCT_STATUS_LABELS[product.status], PRODUCT_STATUS_TONES[product.status])}
+        <span class="muted">HPP dan harga jual memiliki riwayat perubahan</span>
+      </div>
+
+      <div class="kpi-grid kpi-grid-3">
+        ${kpiCard({ label: 'Harga jual aktif', value: formatRupiah(product.price), iconName: 'banknote' })}
+        ${kpiCard({ label: 'HPP aktif', value: formatRupiah(product.currentCost), iconName: 'package' })}
+        ${kpiCard({
+          label: 'Margin kotor',
+          value: margin === null ? 'N/A' : formatPercent(margin),
+          iconName: marginAmount >= 0 ? 'trending-up' : 'trending-down',
+          tone: marginAmount >= 0 ? 'positive' : 'negative',
+          hint: `${formatRupiah(marginAmount)} per unit`,
+        })}
+      </div>
+
+      <div class="detail-grid">
+        ${card({
+          title: 'Informasi produk',
+          body: `
+            <dl class="detail-list">
+              <div><dt>Nama</dt><dd>${escapeHtml(product.name)}</dd></div>
+              <div><dt>SKU</dt><dd><code>${escapeHtml(product.sku)}</code></dd></div>
+              <div><dt>Kategori</dt><dd>${product.category ? escapeHtml(product.category) : '<span class="muted">Belum diisi</span>'}</dd></div>
+              <div><dt>Varian</dt><dd>${product.variant ? escapeHtml(product.variant) : '<span class="muted">Belum diisi</span>'}</dd></div>
+              <div><dt>Status</dt><dd>${badge(PRODUCT_STATUS_LABELS[product.status], PRODUCT_STATUS_TONES[product.status])}</dd></div>
+              <div><dt>Dibuat</dt><dd>${formatDateTime(product.createdAt)}</dd></div>
+              <div><dt>Terakhir diubah</dt><dd>${formatDateTime(product.updatedAt)}</dd></div>
+            </dl>
+            ${product.notes ? `<div class="notes-block"><span class="sensitive-label">Catatan</span><p>${escapeHtml(product.notes)}</p></div>` : ''}
+          `,
+        })}
+        ${card({
+          title: 'Kebijakan HPP',
+          body: `
+            <div class="security-banner">
+              ${icon('shield-check')}
+              <p>Pesanan menyimpan HPP snapshot masing-masing. Mengubah HPP produk tidak mengubah laba pesanan yang sudah tercatat.</p>
+            </div>
+            <p class="inline-note">${icon('info')} Riwayat HPP dan harga jual dibuat otomatis setiap kali nilai berubah melalui formulir produk.</p>
+          `,
+        })}
+      </div>
+
+      ${card({
+        title: 'Riwayat HPP',
+        subtitle: `${costs.length} perubahan tercatat`,
+        padded: false,
+        body: costs.length
+          ? dataTable(
+              ['Tanggal berlaku', 'HPP', 'Catatan', 'Dicatat'],
+              costs.map((entry) => [
+                formatBusinessDate(entry.effectiveAt),
+                `<strong>${formatRupiah(entry.cost)}</strong>`,
+                entry.note ? escapeHtml(entry.note) : '<span class="muted">—</span>',
+                formatDateTime(entry.createdAt),
+              ]),
+            )
+          : emptyState({
+              compact: true,
+              iconName: 'package',
+              title: 'Belum ada riwayat HPP',
+              description: 'Riwayat muncul saat HPP produk diisi atau diubah.',
+            }),
+      })}
+
+      ${card({
+        title: 'Riwayat harga jual',
+        subtitle: `${prices.length} perubahan tercatat`,
+        padded: false,
+        body: prices.length
+          ? dataTable(
+              ['Tanggal berlaku', 'Harga jual', 'Dicatat'],
+              prices.map((entry) => [
+                formatBusinessDate(entry.effectiveAt),
+                `<strong>${formatRupiah(entry.price)}</strong>`,
+                formatDateTime(entry.createdAt),
+              ]),
+            )
+          : emptyState({
+              compact: true,
+              iconName: 'banknote',
+              title: 'Belum ada riwayat harga',
+              description: 'Riwayat muncul saat harga jual produk diisi atau diubah.',
+            }),
+      })}
+
+      ${card({
+        title: 'Hapus produk',
+        body: `
+          <div class="danger-zone danger-row">
+            <div>
+              <strong>Hapus produk secara permanen</strong>
+              <p>Produk yang sudah dipakai pada pesanan tidak dapat dihapus. Nonaktifkan produk agar riwayat tetap utuh.</p>
+            </div>
+            <button type="button" class="btn btn-danger btn-sm" data-delete-product>${icon('trash')}<span>Hapus produk</span></button>
+          </div>
+        `,
+      })}
+    `;
+
+    root.querySelector<HTMLButtonElement>('[data-delete-product]')?.addEventListener('click', async () => {
+      const confirmed = await confirmDialog({
+        title: 'Hapus produk?',
+        message: `Produk "${product.name}" akan dihapus permanen. Produk yang sudah dipakai pada pesanan akan ditolak oleh sistem.`,
+        confirmLabel: 'Hapus produk',
+        tone: 'danger',
+        requireText: product.sku,
+      });
+      if (!confirmed) return;
+      try {
+        await services.productService.delete(product.id);
+        showToast('Produk dihapus.', 'success');
+        context.navigate('/products');
+      } catch (error) {
+        showToast(
+          error instanceof Error ? error.message : 'Produk gagal dihapus.',
+          'error',
+        );
+      }
+    });
+
+    refreshIcons(root);
+  } catch (error) {
+    renderPageError(root, context, error);
+  }
+};

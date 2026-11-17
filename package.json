@@ -1,0 +1,41 @@
+{
+  "name": "manka",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Manka - Konveksi Business Manager (offline-first Android app)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "cap:sync": "npm run build && cap sync android",
+    "cap:open": "cap open android",
+    "android:build": "npm run build && cap sync android && cd android && ./gradlew assembleDebug"
+  },
+  "dependencies": {
+    "@capacitor-community/sqlite": "^8.1.1",
+    "@capacitor/android": "^8.6.2",
+    "@capacitor/core": "^8.6.2",
+    "@capacitor/filesystem": "^8.1.5",
+    "@capacitor/preferences": "^8.0.1",
+    "@capacitor/share": "^8.0.3",
+    "@fontsource/inter": "^5.3.0",
+    "chart.js": "^4.6.1",
+    "exceljs": "^4.4.0",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.9",
+    "lucide": "^1.73.0",
+    "sql.js": "^1.16.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.6.2",
+    "@types/node": "^24.0.0",
+    "@types/sql.js": "^1.4.11",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0"
+  }
+}
