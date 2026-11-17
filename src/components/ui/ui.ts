@@ -116,13 +116,30 @@ export function iconButton(
   return `<button type="button" class="${className}" aria-label="${escapeAttr(label)}" title="${escapeAttr(label)}" ${attributes}>${icon(iconName)}</button>`;
 }
 
+/**
+ * Router aplikasi memakai hash (`#/path`). Semua href internal harus diberi
+ * prefix `#` agar tidak memicu navigasi halaman penuh yang kembali ke dashboard.
+ */
+export function appHref(href: string): string {
+  const value = href.trim();
+  if (
+    value === '' ||
+    value.startsWith('#') ||
+    value.startsWith('//') ||
+    /^[a-z][a-z0-9+.-]*:/i.test(value)
+  ) {
+    return value;
+  }
+  return value.startsWith('/') ? `#${value}` : `#/${value}`;
+}
+
 export function linkButton(
   href: string,
   label: string,
   className = 'btn btn-secondary',
   iconName?: string,
 ): string {
-  return `<a class="${className}" href="${escapeAttr(href)}">${iconName ? icon(iconName) : ''}<span>${escapeHtml(label)}</span></a>`;
+  return `<a class="${className}" href="${escapeAttr(appHref(href))}">${iconName ? icon(iconName) : ''}<span>${escapeHtml(label)}</span></a>`;
 }
 
 export function emptyState(options: {

@@ -83,7 +83,7 @@ Konfigurasi Android:
 
 ### Status verifikasi Android
 
-Proyek Android dan `npx cap sync android` sudah berhasil, tetapi **kompilasi APK belum dapat diverifikasi di lingkungan ini** karena JDK dan Android SDK tidak tersedia (`java: command not found`, `ANDROID_HOME`/`ANDROID_SDK_ROOT` kosong). Jalankan `npm run android:build` pada mesin dengan toolchain lengkap sebelum distribusi. Verifikasi runtime SQLite native juga hanya dapat dilakukan di perangkat/emulator.
+Build debug sudah diverifikasi dengan JDK 21 dan Android SDK 36: `npx cap sync android` dan `./gradlew assembleDebug` berhasil menghasilkan `app-debug.apk`. APK ditandatangani dengan debug key, bukan untuk Play Store, dan diterbitkan sebagai GitHub Release (prerelease).
 
 ## Aturan Finansial
 
@@ -187,7 +187,7 @@ Routing memakai hash (`#/...`) agar kompatibel dengan WebView tanpa server. Rute
 npm test
 ```
 
-Mencakup 48 test pada 7 file: kalkulasi finansial, HPP pesanan, tanggal/periode, parsing CSV, enkripsi, import (validasi/duplikat/transaksi), dan backup/restore. Test memakai `sql.js` asli di Node melalui `tests/helpers/testContext.ts`, bukan mock database.
+Mencakup 52 test pada 8 file: kalkulasi finansial, HPP pesanan, tanggal/periode, parsing CSV, enkripsi, import (validasi/duplikat/transaksi), backup/restore, dan normalisasi tautan navigasi hash. Test memakai `sql.js` asli di Node melalui `tests/helpers/testContext.ts`, bukan mock database.
 
 Pemeriksaan akhir yang disarankan:
 
@@ -200,7 +200,7 @@ npx cap sync android
 
 ## Batasan yang Diketahui
 
-- APK belum dikompilasi/diuji di lingkungan ini karena toolchain Java/Android tidak tersedia.
-- Database native belum diuji runtime di perangkat; adapter web dan seluruh alur aplikasi diuji di Chromium.
+- APK debug sudah dapat dibangun dan diterbitkan; verifikasi runtime database SQLite native masih terbatas pada emulator, belum perangkat fisik.
+- Adapter web dan seluruh alur aplikasi diuji di Chromium.
 - Backup memuat kunci enkripsi, sehingga keamanan file sepenuhnya bergantung pada kekuatan kata sandi backup.
 - Aplikasi tidak menyediakan sinkronisasi antarperangkat; pindahkan data hanya melalui backup/restore.
