@@ -1,5 +1,5 @@
 import type { PageRenderer } from '@/app/router';
-import type { BackupRestoreResult } from '@/core/services/backupService';
+import { APP_VERSION, type BackupRestoreResult } from '@/core/services/backupService';
 import type { ImportBatch, ImportError } from '@/types/entities';
 import { formatDateTime } from '@/core/utils/date';
 import { formatNumber } from '@/core/utils/money';
@@ -321,7 +321,7 @@ export const settingsPage: PageRenderer = async (context) => {
         title: 'Tentang Manka',
         body: `
           <dl class="detail-list detail-list-3">
-            <div><dt>Versi aplikasi</dt><dd>1.0.0</dd></div>
+            <div><dt>Versi aplikasi</dt><dd>${APP_VERSION}</dd></div>
             <div><dt>Zona waktu</dt><dd>Asia/Jakarta</dd></div>
             <div><dt>Mata uang</dt><dd>IDR (Rupiah)</dd></div>
             <div><dt>Penyimpanan</dt><dd>SQLite lokal${services.db.backend === 'web' ? ' (mode browser pengembangan)' : ''}</dd></div>

@@ -15,7 +15,7 @@ import { nowIso } from '@/core/utils/date';
 import { saveFile } from '@/core/import-export/fileSaver';
 import { ValidationError } from '@/core/utils/validation';
 
-export const APP_VERSION = '1.0.0';
+export const APP_VERSION = '1.0.1';
 const BACKUP_FORMAT_VERSION = 1;
 
 interface BackupPayload {
