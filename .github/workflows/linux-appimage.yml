@@ -1,0 +1,104 @@
+name: Build Linux AppImage
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag GitHub Release (mis. v1.0.1-linux)'
+        required: true
+        default: 'v1.0.1-linux'
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: linux-appimage-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build AppImage
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build AppImage
+        run: npm run linux:build
+
+      - name: Verify AppImage
+        run: |
+          APPIMAGE=$(find release -maxdepth 1 -name 'Manka-*-x86_64.AppImage' -print -quit)
+          test -n "$APPIMAGE"
+          test -f "$APPIMAGE"
+          test -x "$APPIMAGE"
+          echo "artifact=$APPIMAGE"
+          file "$APPIMAGE"
+          if readelf -d "$APPIMAGE" | grep -q 'NEEDED'; then
+            echo "Runtime AppImage tidak statis; libfuse2 akan dibutuhkan." >&2
+            exit 1
+          fi
+          cd release
+          sha256sum "$(basename "$APPIMAGE")" > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Upload AppImage artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: manka-linux-appimage
+          path: |
+            release/Manka-*-x86_64.AppImage
+            release/SHA256SUMS
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ inputs.tag }}
+          name: Manka ${{ inputs.tag }} (Linux AppImage)
+          body: |
+            Manka untuk Linux x86_64 — satu file AppImage, data lokal, tanpa server.
+
+            - Runtime AppImage statis: tidak memerlukan `libfuse2`.
+            - Untuk CachyOS/Arch dan distro glibc x86_64 lain.
+            - Data tersimpan di `~/.config/Manka`.
+            - Backup/restore `.manka` kompatibel dengan build Android.
+
+            Jalankan:
+
+            ```bash
+            chmod +x Manka-*.AppImage
+            ./Manka-*.AppImage
+            ```
+
+            Verifikasi unduhan:
+
+            ```bash
+            sha256sum -c SHA256SUMS
+            ```
+
+            Bila FUSE tidak tersedia di lingkungan Anda:
+
+            ```bash
+            APPIMAGE_EXTRACT_AND_RUN=1 ./Manka-*.AppImage
+            ```
+          files: |
+            release/Manka-*-x86_64.AppImage
+            release/SHA256SUMS
+          fail_on_unmatched_files: true
+          prerelease: true

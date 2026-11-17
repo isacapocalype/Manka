@@ -1,9 +1,14 @@
 {
   "name": "manka",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
-  "description": "Manka - Konveksi Business Manager (offline-first Android app)",
+  "productName": "Manka",
+  "desktopName": "manka.desktop",
+  "description": "Manka - Konveksi Business Manager (offline-first Android, browser, dan Linux)",
+  "author": "Manka",
+  "license": "UNLICENSED",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
@@ -13,7 +18,10 @@
     "test:watch": "vitest",
     "cap:sync": "npm run build && cap sync android",
     "cap:open": "cap open android",
-    "android:build": "npm run build && cap sync android && cd android && ./gradlew assembleDebug"
+    "android:build": "npm run build && cap sync android && cd android && ./gradlew assembleDebug",
+    "linux:run": "npm run build && electron .",
+    "linux:build": "npm run build && electron-builder --linux AppImage --x64 --publish never",
+    "linux:pack": "electron-builder --linux AppImage --x64 --publish never"
   },
   "dependencies": {
     "@capacitor-community/sqlite": "^8.1.1",
@@ -34,8 +42,48 @@
     "@capacitor/cli": "^8.6.2",
     "@types/node": "^24.0.0",
     "@types/sql.js": "^1.4.11",
+    "electron": "^45.3.3",
+    "electron-builder": "^26.18.0",
     "typescript": "^5.9.3",
     "vite": "^8.3.8",
     "vitest": "^5.1.0"
+  },
+  "build": {
+    "appId": "id.manka.konveksi",
+    "productName": "Manka",
+    "copyright": "Manka",
+    "asar": true,
+    "npmRebuild": false,
+    "toolsets": {
+      "appimage": "1.0.3"
+    },
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json",
+      "!node_modules/**/*"
+    ],
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "executableName": "manka",
+      "category": "Office",
+      "icon": "build/icon.png",
+      "syncDesktopName": true,
+      "artifactName": "Manka-${version}-${arch}.${ext}",
+      "synopsis": "Manajemen bisnis konveksi offline-first",
+      "description": "Manka menyimpan data toko, pesanan, produk, dan keuangan secara lokal tanpa server.",
+      "maintainer": "Manka"
+    }
   }
 }

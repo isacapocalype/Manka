@@ -1,6 +1,6 @@
 # Manka — Konveksi Business Manager
 
-Aplikasi manajemen bisnis konveksi yang **offline-first**, tanpa backend, tanpa cloud, dan tanpa login. Seluruh data transaksi tersimpan di perangkat. Dibangun sebagai SPA TypeScript/Vite untuk browser dan dibungkus Capacitor untuk Android dengan SQLite native.
+Aplikasi manajemen bisnis konveksi yang **offline-first**, tanpa backend, tanpa cloud, dan tanpa login. Seluruh data transaksi tersimpan di perangkat. Dibangun sebagai SPA TypeScript/Vite untuk browser, dibungkus Capacitor untuk Android dengan SQLite native, dan dibungkus Electron untuk Linux sebagai AppImage dengan `sql.js` + IndexedDB.
 
 Dokumen sumber:
 
@@ -20,6 +20,7 @@ Dokumen sumber:
 - **Backup/restore** — snapshot logis seluruh data + kunci enkripsi, dibungkus password, dapat disalin keluar aplikasi.
 - **Audit log** — mencatat perubahan data penting dan akses data sensitif tanpa menyimpan nilainya.
 - **Responsif** — sidebar desktop dan bottom navigation mobile.
+- **Linux** — AppImage x86_64 mandiri untuk CachyOS/Arch dan distro glibc lain; data lokal di direktori konfigurasi pengguna.
 
 ## Stack
 
@@ -27,9 +28,10 @@ Dokumen sumber:
 | --- | --- |
 | UI | TypeScript, HTML, CSS (tanpa framework UI) |
 | Build | Vite, `tsc --noEmit` |
-| Database browser | `sql.js` (SQLite WASM), byte database disimpan di IndexedDB |
+| Database browser & Linux | `sql.js` (SQLite WASM), byte database disimpan di IndexedDB |
 | Database Android | `@capacitor-community/sqlite` |
 | Android shell | Capacitor 8 |
+| Linux shell | Electron 45.3.3, AppImage x86_64 |
 | Enkripsi | Web Crypto AES-GCM 256, kunci acak per perangkat via Capacitor Preferences |
 | Ekspor | ExcelJS, jsPDF + autotable |
 | Grafik | Chart.js |
@@ -84,6 +86,62 @@ Konfigurasi Android:
 ### Status verifikasi Android
 
 Build debug sudah diverifikasi dengan JDK 21 dan Android SDK 36: `npx cap sync android` dan `./gradlew assembleDebug` berhasil menghasilkan `app-debug.apk`. APK ditandatangani dengan debug key, bukan untuk Play Store, dan diterbitkan sebagai GitHub Release (prerelease).
+
+## Build Linux (AppImage)
+
+Target Linux resmi hanya **AppImage x86_64** untuk CachyOS/Arch dan distro glibc lain. Tidak ada paket pacman, deb, atau instalasi sistem; aplikasi berjalan langsung dari satu file dan tidak membutuhkan akses root.
+
+Prasyarat: Node.js `^20.19.0` atau `>=22.12.0`, npm, dan koneksi internet saat build untuk mengunduh Electron serta toolset AppImage. Build tidak memerlukan `libfuse2`.
+
+```bash
+npm install
+npm run linux:build
+```
+
+Hasil: `release/Manka-1.0.1-x86_64.AppImage` (nama mengikuti versi di `package.json`).
+
+Menjalankan:
+
+```bash
+chmod +x release/Manka-1.0.1-x86_64.AppImage
+./release/Manka-1.0.1-x86_64.AppImage
+```
+
+AppImage dapat juga dibuka lewat file manager setelah diberi izin eksekusi. Runtime AppImage dibuat statis, sehingga `libfuse2` tidak perlu dipasang. Bila kernel atau lingkungan tidak menyediakan FUSE, gunakan mode ekstraksi:
+
+```bash
+APPIMAGE_EXTRACT_AND_RUN=1 ./release/Manka-1.0.1-x86_64.AppImage
+```
+
+Perintah pengembangan:
+
+```bash
+npm run linux:run   # build web + jalankan Electron dari source
+npm run linux:pack  # bungkus ulang tanpa build web
+```
+
+Penyimpanan Linux:
+
+- Database SQLite (`sql.js`) disimpan sebagai byte di IndexedDB milik Electron.
+- Lokasi data mengikuti `userData` Electron: `~/.config/Manka` (atau `$XDG_CONFIG_HOME/Manka`).
+- Jangan membuka dua instance aplikasi sekaligus; instance kedua hanya memfokuskan jendela yang sudah berjalan.
+- Jangan menghapus direktori tersebut kecuali setelah membuat backup.
+- Ekspor CSV/XLSX/PDF dan backup memakai dialog **Simpan file** native.
+
+### Verifikasi Linux
+
+AppImage `v1.0.1` sudah diuji langsung di CachyOS x86_64 tanpa `libfuse2`: aplikasi terbuka, navigasi **Tambah toko** berfungsi, data toko tersimpan, data tetap ada setelah aplikasi ditutup dan dibuka kembali, serta backup `.manka` dapat diekspor dan dipulihkan.
+
+### Pindah data Android ↔ Linux
+
+Kedua build memakai skema database dan format backup yang sama:
+
+1. Di perangkat asal buka **Pengaturan → Backup**, buat file `.manka`, lalu simpan ke penyimpanan yang dapat dipindahkan.
+2. Pindahkan file ke perangkat tujuan.
+3. Buka **Pengaturan → Restore**, pilih file, masukkan kata sandi, periksa ringkasan, lalu ketik `PULIHKAN`.
+4. Setelah restore, aplikasi kembali ke dashboard dengan seluruh data dan kunci enkripsi dari backup.
+
+Backup memuat kunci enkripsi profil toko. Simpan file dan kata sandinya di tempat aman; siapa pun yang memilikinya dapat membaca seluruh data.
 
 ## Aturan Finansial
 
@@ -177,6 +235,9 @@ src/modules/               Halaman per modul (dashboard, toko, produk, dst.)
 src/styles/                CSS responsif dan token desain
 tests/                     Test Vitest dengan database sql.js asli
 android/                   Proyek Capacitor Android
+electron/                  Proses utama Electron (protokol manka://, jendela, unduhan)
+build/                     Ikon aplikasi untuk Electron/AppImage
+release/                   Hasil build AppImage (tidak di-commit)
 ```
 
 Routing memakai hash (`#/...`) agar kompatibel dengan WebView tanpa server. Rute statis seperti `#/orders/new` didaftarkan sebelum rute `:id`.
@@ -196,11 +257,13 @@ npx tsc --noEmit
 npm test
 npm run build
 npx cap sync android
+npm run linux:build
 ```
 
 ## Batasan yang Diketahui
 
 - APK debug sudah dapat dibangun dan diterbitkan; verifikasi runtime database SQLite native masih terbatas pada emulator, belum perangkat fisik.
-- Adapter web dan seluruh alur aplikasi diuji di Chromium.
+- Adapter web dan alur aplikasi diuji di Chromium; shell Electron dan AppImage diuji langsung di CachyOS x86_64.
+- Build Linux hanya menyediakan AppImage x86_64; tidak ada paket instalasi sistem atau build ARM.
 - Backup memuat kunci enkripsi, sehingga keamanan file sepenuhnya bergantung pada kekuatan kata sandi backup.
 - Aplikasi tidak menyediakan sinkronisasi antarperangkat; pindahkan data hanya melalui backup/restore.
