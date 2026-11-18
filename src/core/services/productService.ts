@@ -1,6 +1,7 @@
 import type { Database } from '@/core/database/types';
 import type { Product, ProductCostEntry, ProductFilters, ProductInput, ProductPriceEntry, ProductStatus } from '@/types/entities';
 import type { ProductRepository } from '@/core/repositories/productRepository';
+import type { ProductBomRepository } from '@/core/repositories/productBomRepository';
 import type { AuditRepository } from '@/core/repositories/auditRepository';
 import {
   ConflictError,
@@ -25,11 +26,18 @@ function validateStatus(value: string): ProductStatus {
 export class ProductService {
   private readonly db: Database;
   private readonly products: ProductRepository;
+  private readonly bom: ProductBomRepository;
   private readonly audit: AuditRepository;
 
-  constructor(db: Database, products: ProductRepository, audit: AuditRepository) {
+  constructor(
+    db: Database,
+    products: ProductRepository,
+    bom: ProductBomRepository,
+    audit: AuditRepository,
+  ) {
     this.db = db;
     this.products = products;
+    this.bom = bom;
     this.audit = audit;
   }
 
@@ -125,6 +133,14 @@ export class ProductService {
     const duplicate = await this.products.getBySku(sku);
     if (duplicate && duplicate.id !== id) {
       throw new ConflictError(`SKU "${sku}" sudah digunakan oleh produk lain.`);
+    }
+
+    const bomCount = await this.bom.countByProduct(id);
+    if (bomCount > 0 && cost !== null && cost !== existing.currentCost) {
+      throw new ValidationError(
+        'HPP produk ini dihitung dari BOM. Ubah komponen BOM atau biaya material untuk memperbarui HPP.',
+        { cost: 'HPP mengikuti perhitungan BOM dan tidak dapat diisi manual.' },
+      );
     }
 
     try {

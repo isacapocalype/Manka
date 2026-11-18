@@ -45,6 +45,12 @@ const MAIN_LINKS: MoreLink[] = [
     iconName: 'package',
   },
   {
+    href: '/materials',
+    label: 'Material',
+    description: 'Bahan baku dan biaya satuan untuk menyusun BOM serta HPP produk.',
+    iconName: 'boxes',
+  },
+  {
     href: '/reports',
     label: 'Laporan',
     description: 'Laporan harian, bulanan, tahunan, per toko, dan ekspor CSV/Excel/PDF.',

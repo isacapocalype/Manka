@@ -112,6 +112,28 @@ export function parseMoneyInput(raw: string): number | null {
   return sign * value;
 }
 
+/**
+ * Parse kuantitas desimal (maksimal 4 angka desimal).
+ * Menerima titik atau koma sebagai pemisah desimal, mis. "1,25" atau "1.25".
+ */
+export function parseDecimalInput(raw: string): number | null {
+  const cleaned = raw.trim().replace(/\s+/g, '').replace(',', '.');
+  if (!/^\d+(\.\d{1,4})?$/.test(cleaned)) return null;
+  const value = Number(cleaned);
+  return Number.isFinite(value) ? value : null;
+}
+
+const QUANTITY_FORMATTER = new Intl.NumberFormat('id-ID', {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 4,
+});
+
+/** Format kuantitas desimal tanpa menghilangkan pecahan penting. */
+export function formatQuantity(value: number): string {
+  if (!Number.isFinite(value)) return '0';
+  return QUANTITY_FORMATTER.format(value);
+}
+
 export function parseIntegerInput(raw: string): number | null {
   const cleaned = raw.trim().replace(/\s+/g, '');
   if (!/^-?\d+$/.test(cleaned)) return null;

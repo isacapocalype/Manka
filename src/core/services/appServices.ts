@@ -14,6 +14,8 @@ import { ImportRepository } from '@/core/repositories/importRepository';
 import { SettingsRepository } from '@/core/repositories/settingsRepository';
 import { BackupRepository } from '@/core/repositories/backupRepository';
 import { WorkOrderRepository } from '@/core/repositories/workOrderRepository';
+import { MaterialRepository } from '@/core/repositories/materialRepository';
+import { ProductBomRepository } from '@/core/repositories/productBomRepository';
 import { StoreService } from './storeService';
 import { ProductService } from './productService';
 import { OrderService } from './orderService';
@@ -30,6 +32,8 @@ import { ReportService } from './reportService';
 import { ProductProfitService } from './productProfitService';
 import { DataHealthService } from './dataHealthService';
 import { ProductionService } from './productionService';
+import { MaterialService } from './materialService';
+import { BomService } from './bomService';
 
 export interface AppServices {
   db: Database;
@@ -47,6 +51,8 @@ export interface AppServices {
   settings: SettingsRepository;
   backupRepo: BackupRepository;
   workOrders: WorkOrderRepository;
+  materials: MaterialRepository;
+  productBom: ProductBomRepository;
   storeService: StoreService;
   productService: ProductService;
   orderService: OrderService;
@@ -63,6 +69,8 @@ export interface AppServices {
   productProfitService: ProductProfitService;
   dataHealthService: DataHealthService;
   productionService: ProductionService;
+  materialService: MaterialService;
+  bomService: BomService;
 }
 
 export function createAppServices(
@@ -83,9 +91,11 @@ export function createAppServices(
   const settings = new SettingsRepository(db);
   const backupRepo = new BackupRepository(db);
   const workOrders = new WorkOrderRepository(db);
+  const materials = new MaterialRepository(db);
+  const productBom = new ProductBomRepository(db);
 
   const storeService = new StoreService(stores, audit, encryption);
-  const productService = new ProductService(db, products, audit);
+  const productService = new ProductService(db, products, productBom, audit);
   const orderService = new OrderService(db, orders, products, stores, audit);
   const feeService = new FeeService(fees, stores, orders, audit);
   const advertisingService = new AdvertisingService(advertising, stores, audit);
@@ -116,6 +126,8 @@ export function createAppServices(
   const reportService = new ReportService(financeService, stores, productProfitService);
   const dataHealthService = new DataHealthService(orders, products, settlements, settings);
   const productionService = new ProductionService(workOrders, orders, audit);
+  const materialService = new MaterialService(materials, productBom, products, audit);
+  const bomService = new BomService(productBom, materials, products, audit);
 
   return {
     db,
@@ -133,6 +145,8 @@ export function createAppServices(
     settings,
     backupRepo,
     workOrders,
+    materials,
+    productBom,
     storeService,
     productService,
     orderService,
@@ -149,6 +163,8 @@ export function createAppServices(
     productProfitService,
     dataHealthService,
     productionService,
+    materialService,
+    bomService,
   };
 }
 

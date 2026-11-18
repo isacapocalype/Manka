@@ -30,7 +30,7 @@ function isLinkActive(href: string, path: string, kind: 'main' | 'finance' | 'mo
   if (kind === 'mobile') {
     if (href === '/dashboard') return path === '/dashboard';
     if (href === '/more') {
-      return ['/more', '/stores', '/reports', '/production', '/settings'].some(
+      return ['/more', '/stores', '/reports', '/production', '/materials', '/settings'].some(
         (prefix) => path === prefix || path.startsWith(`${prefix}/`),
       );
     }
@@ -46,7 +46,9 @@ export function createLayout(
   onNavigate: (path: string) => void,
 ): LayoutHandle {
   const sidebarMainTop = MAIN_NAV.filter((item) =>
-    ['/dashboard', '/stores', '/orders', '/production', '/products'].includes(item.href),
+    ['/dashboard', '/stores', '/orders', '/production', '/products', '/materials'].includes(
+      item.href,
+    ),
   );
   const sidebarBottom = MAIN_NAV.filter((item) =>
     ['/reports', '/health', '/settings'].includes(item.href),

@@ -1,5 +1,6 @@
 import type { PageRenderer } from '@/app/router';
 import type { Product, ProductInput, ProductStatus } from '@/types/entities';
+import type { BomSummary } from '@/types/bom';
 import { ValidationError } from '@/core/utils/validation';
 import { formatRupiah } from '@/core/utils/money';
 import { icon } from '@/components/ui/icons';
@@ -27,18 +28,25 @@ export const productFormPage: PageRenderer = async (context) => {
 
   try {
     let product: Product | null = null;
+    let bomSummary: BomSummary | null = null;
     if (id) {
-      product = await services.productService.get(id);
+      [product, bomSummary] = await Promise.all([
+        services.productService.get(id),
+        services.bomService.getSummary(id),
+      ]);
     }
     if (context.signal.aborted) return;
     context.setTitle(isEdit ? 'Ubah produk' : 'Produk baru');
+    const costFromBom = bomSummary?.usingBom ?? false;
 
     root.innerHTML = `
       ${pageHeader({
         eyebrow: 'Master produk',
         title: isEdit ? 'Ubah produk' : 'Tambah produk',
         subtitle: isEdit
-          ? 'Perubahan HPP dan harga jual dicatat sebagai riwayat baru. Pesanan lama tetap memakai snapshot HPP saat dibuat.'
+          ? costFromBom
+            ? 'HPP produk ini dihitung dari BOM. Harga jual dan detail produk tetap dapat diubah.'
+            : 'Perubahan HPP dan harga jual dicatat sebagai riwayat baru. Pesanan lama tetap memakai snapshot HPP saat dibuat.'
           : 'HPP dan harga jual akan dicatat sebagai riwayat awal produk.',
         actions: `<a class="btn btn-secondary" href="#${isEdit && id ? `/products/${id}` : '/products'}">${icon('arrow-left')}<span>Kembali</span></a>`,
       })}
@@ -101,7 +109,9 @@ export const productFormPage: PageRenderer = async (context) => {
         <div class="form-section">
           <div class="form-section-head">
             <h2>Harga dan HPP</h2>
-            <p>Nominal dalam Rupiah bulat. HPP saat ini: <strong>${formatRupiah(product?.currentCost ?? 0)}</strong>.</p>
+            <p>Nominal dalam Rupiah bulat. HPP saat ini: <strong>${formatRupiah(
+              costFromBom ? (bomSummary?.totalCost ?? product?.currentCost ?? 0) : (product?.currentCost ?? 0),
+            )}</strong>${costFromBom ? ' (dari BOM)' : ''}.</p>
           </div>
           <div class="form-grid">
             ${formField({
@@ -114,17 +124,25 @@ export const productFormPage: PageRenderer = async (context) => {
               help: 'Harga jual aktif per unit. Perubahan akan dicatat pada riwayat harga.',
               idPrefix: 'product',
             })}
-            ${formField({
-              name: 'cost',
-              label: 'HPP',
-              type: 'money',
-              value: isEdit ? '' : product ? String(product.currentCost) : '',
-              placeholder: isEdit ? 'Biarkan kosong untuk mempertahankan HPP' : '0',
-              help: isEdit
-                ? 'Isi hanya jika HPP berubah. Nilai baru dicatat pada riwayat HPP dengan tanggal hari ini.'
-                : 'Opsional. HPP akan menjadi snapshot pada pesanan baru.',
-              idPrefix: 'product',
-            })}
+            ${
+              costFromBom && isEdit && id
+                ? `<div class="field" data-field="cost">
+                    <span class="field-label">HPP</span>
+                    <p class="form-static-value"><strong>${formatRupiah(bomSummary?.totalCost ?? 0)}</strong> per unit</p>
+                    <p class="field-help">HPP dihitung dari BOM. <a class="table-link" href="#/products/${id}/bom">Kelola komponen BOM</a> untuk mengubahnya.</p>
+                  </div>`
+                : formField({
+                    name: 'cost',
+                    label: 'HPP',
+                    type: 'money',
+                    value: isEdit ? '' : product ? String(product.currentCost) : '',
+                    placeholder: isEdit ? 'Biarkan kosong untuk mempertahankan HPP' : '0',
+                    help: isEdit
+                      ? 'Isi hanya jika HPP berubah. Nilai baru dicatat pada riwayat HPP dengan tanggal hari ini.'
+                      : 'Opsional. HPP akan menjadi snapshot pada pesanan baru.',
+                    idPrefix: 'product',
+                  })
+            }
             ${formField({
               name: 'notes',
               label: 'Catatan',
@@ -138,7 +156,11 @@ export const productFormPage: PageRenderer = async (context) => {
           </div>
           <div class="form-info">
             ${icon('info')}
-            <p>Perubahan HPP tidak mengubah laba pesanan lama. Setiap item pesanan menyimpan HPP snapshot saat transaksi dibuat atau diimpor.</p>
+            <p>${
+              costFromBom
+                ? 'HPP mengikuti total BOM dan tidak dapat diisi manual di sini. Perubahan BOM atau biaya material otomatis mencatat riwayat HPP baru.'
+                : 'Perubahan HPP tidak mengubah laba pesanan lama. Setiap item pesanan menyimpan HPP snapshot saat transaksi dibuat atau diimpor.'
+            }</p>
           </div>
         </div>
 
@@ -160,7 +182,7 @@ export const productFormPage: PageRenderer = async (context) => {
       setButtonLoading(submit, true, 'Menyimpan…');
       try {
         const costRaw = readText(form, 'cost');
-        const cost = costRaw === '' ? null : readOptionalMoney(form, 'cost', 'HPP');
+        const cost = costFromBom ? null : costRaw === '' ? null : readOptionalMoney(form, 'cost', 'HPP');
         const input: ProductInput = {
           name: readText(form, 'name'),
           sku: readText(form, 'sku'),

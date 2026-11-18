@@ -306,6 +306,58 @@ describe('backup and restore', () => {
     });
   });
 
+  it('restores materials and BOM components with their HPP', async () => {
+    const source = await createTestContext();
+    const material = await source.services.materialService.create({
+      name: 'Kain Backup',
+      unit: 'meter',
+      unitCost: 25_000,
+      status: 'active',
+      notes: 'Katun',
+    });
+    const product = await source.services.productService.create({
+      name: 'Kaos Backup BOM',
+      sku: 'BKP-BOM-01',
+      price: 100_000,
+      cost: 0,
+      status: 'active',
+    });
+    await source.services.bomService.addItem(product.id, {
+      type: 'material',
+      materialId: material.id,
+      quantity: 1.5,
+    });
+    await source.services.bomService.addItem(product.id, {
+      type: 'labor',
+      label: 'Jahit',
+      amount: 10_000,
+    });
+    const password = 'kata-sandi-backup';
+    const file = await makeBackup(source, password);
+
+    const target = await createTestContext();
+    const inspection = await target.services.backupService.inspectBackup(file, password);
+    expect(inspection.tableCounts.materials).toBe(1);
+    expect(inspection.tableCounts.product_bom_items).toBe(2);
+
+    await target.services.backupService.restoreBackup(file, password);
+    const summary = await target.services.bomService.getSummary(product.id);
+    expect(summary).toMatchObject({
+      materialCost: 37_500,
+      laborCost: 10_000,
+      totalCost: 47_500,
+      componentCount: 2,
+      usingBom: true,
+    });
+    expect(summary.items[0]).toMatchObject({
+      materialName: 'Kain Backup',
+      materialUnit: 'meter',
+      materialUnitCost: 25_000,
+      quantity: 1.5,
+    });
+    expect((await target.services.productService.get(product.id)).currentCost).toBe(47_500);
+  });
+
   it('rejects backups with incomplete tables', async () => {
     const { services } = await createTestContext();
     const envelope = await createBackupEnvelope(

@@ -6,6 +6,9 @@ import { storeFormPage } from '@/modules/stores/storeFormPage';
 import { productListPage } from '@/modules/products/productListPage';
 import { productDetailPage } from '@/modules/products/productDetailPage';
 import { productFormPage } from '@/modules/products/productFormPage';
+import { productBomPage } from '@/modules/products/productBomPage';
+import { materialListPage } from '@/modules/materials/materialListPage';
+import { materialFormPage } from '@/modules/materials/materialFormPage';
 import { orderListPage } from '@/modules/orders/orderListPage';
 import { orderDetailPage } from '@/modules/orders/orderDetailPage';
 import { orderFormPage } from '@/modules/orders/orderFormPage';
@@ -42,6 +45,11 @@ export const APP_ROUTES: RouteDefinition[] = [
   { path: '/products/new', title: 'Produk baru', render: productFormPage },
   { path: '/products/:id', title: 'Detail produk', render: productDetailPage },
   { path: '/products/:id/edit', title: 'Ubah produk', render: productFormPage },
+  { path: '/products/:id/bom', title: 'BOM produk', render: productBomPage },
+
+  { path: '/materials', title: 'Material', render: materialListPage },
+  { path: '/materials/new', title: 'Material baru', render: materialFormPage },
+  { path: '/materials/:id/edit', title: 'Ubah material', render: materialFormPage },
 
   { path: '/orders', title: 'Pesanan', render: orderListPage },
   { path: '/orders/new', title: 'Pesanan baru', render: orderFormPage },

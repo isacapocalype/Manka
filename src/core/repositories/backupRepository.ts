@@ -69,6 +69,37 @@ export const BACKUP_TABLES: readonly BackupTableDefinition[] = [
     columns: ['id', 'product_id', 'price', 'effective_at', 'created_at'],
   },
   {
+    name: 'materials',
+    since: 3,
+    columns: [
+      'id',
+      'name',
+      'unit',
+      'unit_cost',
+      'status',
+      'notes',
+      'created_at',
+      'updated_at',
+    ],
+  },
+  {
+    name: 'product_bom_items',
+    since: 3,
+    columns: [
+      'id',
+      'product_id',
+      'item_type',
+      'material_id',
+      'label',
+      'quantity',
+      'amount',
+      'notes',
+      'sort_order',
+      'created_at',
+      'updated_at',
+    ],
+  },
+  {
     name: 'orders',
     columns: [
       'id',

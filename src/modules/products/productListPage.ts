@@ -75,7 +75,10 @@ export const productListPage: PageRenderer = async (context) => {
         eyebrow: 'Master produk',
         title: 'Produk',
         subtitle: `${formatNumber(allProducts.length)} produk · ${formatNumber(activeCount)} aktif`,
-        actions: linkButton('/products/new', 'Tambah produk', 'btn btn-primary', 'plus'),
+        actions: `
+          ${linkButton('/materials', 'Material & BOM', 'btn btn-secondary', 'boxes')}
+          ${linkButton('/products/new', 'Tambah produk', 'btn btn-primary', 'plus')}
+        `,
       })}
 
       <div class="filter-bar product-filter-bar">

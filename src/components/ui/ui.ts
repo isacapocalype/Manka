@@ -2,7 +2,7 @@ import { escapeAttr, escapeHtml } from './dom';
 import { icon, refreshIcons } from './icons';
 import { showToast } from './toast';
 import { ValidationError, errorMessage } from '@/core/utils/validation';
-import { parseIntegerInput, parseMoneyInput } from '@/core/utils/money';
+import { parseDecimalInput, parseIntegerInput, parseMoneyInput } from '@/core/utils/money';
 import type { BadgeTone } from '@/app/labels';
 
 export interface PageHeaderOptions {
@@ -254,7 +254,7 @@ export function bindPagination(root: ParentNode, handler: (page: number) => void
 export interface FormFieldOptions {
   name: string;
   label: string;
-  type?: 'text' | 'email' | 'tel' | 'date' | 'password' | 'search' | 'money' | 'integer' | 'select' | 'textarea';
+  type?: 'text' | 'email' | 'tel' | 'date' | 'password' | 'search' | 'money' | 'integer' | 'decimal' | 'select' | 'textarea';
   value?: string | number | null;
   required?: boolean;
   placeholder?: string;
@@ -288,8 +288,11 @@ export function formField(options: FormFieldOptions): string {
     </select>`;
   } else if (type === 'textarea') {
     control = `<textarea class="input textarea" id="${escapeAttr(id)}" name="${escapeAttr(options.name)}" rows="${options.rows ?? 3}" placeholder="${escapeAttr(options.placeholder ?? '')}"${aria}${disabled}>${escapeHtml(value)}</textarea>`;
-  } else if (type === 'money' || type === 'integer') {
-    control = `<div class="input-affix"><span class="affix">${type === 'money' ? 'Rp' : '#'}</span><input class="input" id="${escapeAttr(id)}" name="${escapeAttr(options.name)}" type="text" inputmode="numeric" value="${escapeAttr(value)}" placeholder="${escapeAttr(options.placeholder ?? (type === 'money' ? '0' : '1'))}"${aria}${disabled} /></div>`;
+  } else if (type === 'money' || type === 'integer' || type === 'decimal') {
+    const affix = type === 'money' ? 'Rp' : '#';
+    const inputMode = type === 'decimal' ? 'decimal' : 'numeric';
+    const placeholder = type === 'money' ? '0' : type === 'integer' ? '1' : '1,5';
+    control = `<div class="input-affix"><span class="affix">${affix}</span><input class="input" id="${escapeAttr(id)}" name="${escapeAttr(options.name)}" type="text" inputmode="${inputMode}" value="${escapeAttr(value)}" placeholder="${escapeAttr(options.placeholder ?? placeholder)}"${aria}${disabled} /></div>`;
   } else {
     const autocomplete = options.autocomplete
       ? ` autocomplete="${escapeAttr(options.autocomplete)}"`
@@ -445,6 +448,34 @@ export function readMoney(
   if (value === null || value < 0) {
     throw new ValidationError(`${label} tidak valid.`, {
       [name]: `${label} harus berupa nominal Rupiah bulat minimal 0.`,
+    });
+  }
+  return value;
+}
+
+export function readDecimal(
+  form: HTMLFormElement,
+  name: string,
+  label: string,
+  options: { required?: boolean; min?: number; max?: number } = {},
+): number {
+  const raw = readText(form, name);
+  if (raw === '') {
+    if (options.required) {
+      throw new ValidationError(`${label} wajib diisi.`, { [name]: `${label} wajib diisi.` });
+    }
+    return 0;
+  }
+  const value = parseDecimalInput(raw);
+  const min = options.min ?? 0;
+  if (value === null || value < min) {
+    throw new ValidationError(`${label} tidak valid.`, {
+      [name]: `${label} harus berupa angka minimal ${min} dengan maksimal 4 angka desimal.`,
+    });
+  }
+  if (options.max !== undefined && value > options.max) {
+    throw new ValidationError(`${label} terlalu besar.`, {
+      [name]: `${label} maksimal ${options.max}.`,
     });
   }
   return value;

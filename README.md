@@ -13,7 +13,9 @@ Dokumen sumber:
 - **Dashboard** — KPI periode/toko, tren penjualan dan laba operasional, ringkasan biaya, performa toko, serta transaksi terbaru.
 - **Toko** — multi-toko (Shopee, TikTok Shop, lainnya), profil kontak, password marketplace dan rekening bank terenkripsi, arsip toko.
 - **Produk** — SKU unik, kategori/varian, harga jual, HPP, riwayat perubahan HPP dan harga jual.
+- **Material & BOM** — bahan baku dengan biaya satuan, komponen material/tenaga kerja/overhead per unit produk, dan HPP otomatis dari BOM.
 - **Pesanan** — status internal, item pesanan, diskon penjual/marketplace, ongkir, snapshot HPP permanen, pencarian/filter.
+- **Produksi** — work order dari item pesanan atau manual, tahap antrian → potong → jahit → finishing → QC → packing → selesai, PIC/vendor, tenggat, kuantitas lolos/cacat, dan riwayat tahap.
 - **Keuangan** — biaya marketplace, iklan (kampanye + biaya), biaya operasional (per toko atau bersama), refund, settlement.
 - **Laporan** — periode hari ini, minggu ini/lalu, 7/30 hari, bulan ini/lalu, tahun ini, dan rentang kustom; semua toko atau per toko; ekspor CSV, XLSX, dan PDF berisi data aktual.
 - **Import pesanan** — CSV/XLSX dengan pratinjau, pemetaan kolom, validasi per baris, deteksi duplikat, dan eksekusi transaksional.
@@ -151,6 +153,7 @@ Semua nominal disimpan sebagai **integer Rupiah**; tidak ada floating point untu
 - **Penjualan bersih** = omzet − diskon penjual − refund selesai (refund dihitung satu kali).
 - **Diskon marketplace tidak mengurangi pendapatan penjual**; nilainya hanya informasi.
 - **HPP** memakai snapshot saat pesanan dibuat/diimpor, sehingga perubahan HPP produk tidak mengubah laba pesanan lama.
+- **HPP dari BOM** = Σ(kuantitas material × biaya satuan) + tenaga kerja + overhead per unit. Setiap perubahan BOM atau biaya material mencatat riwayat HPP baru; BOM hanya menghitung biaya, tanpa pencatatan stok.
 - **Laba kotor** = penjualan bersih − HPP terjual.
 - **Laba operasional** = laba kotor − biaya marketplace aktual − biaya iklan − biaya operasional.
 - **Settlement adalah arus kas**, bukan pendapatan; tidak menambah omzet.
@@ -199,7 +202,7 @@ Perilaku:
 
 Halaman: **Pengaturan**.
 
-- Backup menghasilkan file `.manka` berisi seluruh tabel data (toko, produk, riwayat HPP/harga, pesanan, item, biaya, iklan, refund, settlement, import, audit, pengaturan) **dan kunci enkripsi profil**.
+- Backup menghasilkan file `.manka` berisi seluruh tabel data (toko, produk, material, BOM, riwayat HPP/harga, pesanan, item, work order produksi, biaya, iklan, refund, settlement, import, audit, pengaturan) **dan kunci enkripsi profil**.
 - File adalah envelope JSON `format: "manka-backup", version: 1` dengan PBKDF2-SHA-256 dan AES-GCM. Kata sandi minimal 8 karakter.
 - Di browser file diunduh; di Android file ditulis ke Cache lalu dibagikan melalui Share sheet agar dapat disimpan keluar aplikasi.
 - Restore selalu **inspeksi dulu**: file dan sandi divalidasi, versi skema diperiksa, ringkasan tabel ditampilkan. Pengguna harus mengetik `PULIHKAN` sebelum data diganti.
@@ -248,7 +251,7 @@ Routing memakai hash (`#/...`) agar kompatibel dengan WebView tanpa server. Rute
 npm test
 ```
 
-Mencakup 52 test pada 8 file: kalkulasi finansial, HPP pesanan, tanggal/periode, parsing CSV, enkripsi, import (validasi/duplikat/transaksi), backup/restore, dan normalisasi tautan navigasi hash. Test memakai `sql.js` asli di Node melalui `tests/helpers/testContext.ts`, bukan mock database.
+Mencakup 85 test pada 13 file: kalkulasi finansial, HPP pesanan dan BOM, tanggal/periode, parsing CSV, enkripsi, import (validasi/duplikat/transaksi), backup/restore lintas versi skema, produksi, dan normalisasi tautan navigasi hash. Test memakai `sql.js` asli di Node melalui `tests/helpers/testContext.ts`, bukan mock database.
 
 Pemeriksaan akhir yang disarankan:
 
@@ -267,3 +270,4 @@ npm run linux:build
 - Build Linux hanya menyediakan AppImage x86_64; tidak ada paket instalasi sistem atau build ARM.
 - Backup memuat kunci enkripsi, sehingga keamanan file sepenuhnya bergantung pada kekuatan kata sandi backup.
 - Aplikasi tidak menyediakan sinkronisasi antarperangkat; pindahkan data hanya melalui backup/restore.
+- BOM tidak melacak stok material dan tidak membuat jurnal persediaan; biaya material dihitung langsung dari biaya satuan aktif.

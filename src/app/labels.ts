@@ -15,6 +15,7 @@ import type {
   ProductionStage,
   WorkOrderStatus,
 } from '@/types/production';
+import type { BomItemType } from '@/types/bom';
 
 export type BadgeTone = 'neutral' | 'primary' | 'success' | 'warning' | 'danger' | 'info';
 
@@ -42,6 +43,18 @@ export const PRODUCT_STATUS_LABELS: Record<ProductStatus, string> = {
 export const PRODUCT_STATUS_TONES: Record<ProductStatus, BadgeTone> = {
   active: 'success',
   inactive: 'neutral',
+};
+
+export const BOM_ITEM_TYPE_LABELS: Record<BomItemType, string> = {
+  material: 'Material',
+  labor: 'Tenaga kerja',
+  overhead: 'Overhead',
+};
+
+export const BOM_ITEM_TYPE_TONES: Record<BomItemType, BadgeTone> = {
+  material: 'info',
+  labor: 'primary',
+  overhead: 'warning',
 };
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {

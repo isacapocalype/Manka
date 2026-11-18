@@ -1,11 +1,15 @@
 import type { PageRenderer } from '@/app/router';
-import { PRODUCT_STATUS_LABELS, PRODUCT_STATUS_TONES } from '@/app/labels';
+import {
+  BOM_ITEM_TYPE_LABELS,
+  PRODUCT_STATUS_LABELS,
+  PRODUCT_STATUS_TONES,
+} from '@/app/labels';
 import {
   calculateProductMarginAmount,
   calculateProductMarginPercent,
 } from '@/core/calculations/productMath';
 import { formatBusinessDate, formatDateTime } from '@/core/utils/date';
-import { formatPercent, formatRupiah } from '@/core/utils/money';
+import { formatNumber, formatPercent, formatQuantity, formatRupiah } from '@/core/utils/money';
 import { escapeHtml } from '@/components/ui/dom';
 import { icon, refreshIcons } from '@/components/ui/icons';
 import {
@@ -28,16 +32,18 @@ export const productDetailPage: PageRenderer = async (context) => {
   root.innerHTML = loadingBlock('Memuat produk…');
 
   try {
-    const [product, costs, prices] = await Promise.all([
+    const [product, costs, prices, bom] = await Promise.all([
       services.productService.get(id),
       services.productService.listCosts(id),
       services.productService.listPrices(id),
+      services.bomService.getSummary(id),
     ]);
     if (context.signal.aborted) return;
     context.setTitle(product.name);
 
-    const margin = calculateProductMarginPercent(product.price, product.currentCost);
-    const marginAmount = calculateProductMarginAmount(product.price, product.currentCost);
+    const activeCost = bom.usingBom ? bom.totalCost : product.currentCost;
+    const margin = calculateProductMarginPercent(product.price, activeCost);
+    const marginAmount = calculateProductMarginAmount(product.price, activeCost);
 
     root.innerHTML = `
       ${pageHeader({
@@ -46,6 +52,7 @@ export const productDetailPage: PageRenderer = async (context) => {
         subtitle: `${product.sku}${product.category ? ` · ${product.category}` : ''}${product.variant ? ` · ${product.variant}` : ''}`,
         actions: `
           <a class="btn btn-secondary" href="#/products">${icon('arrow-left')}<span>Kembali</span></a>
+          ${linkButton(`/products/${product.id}/bom`, 'BOM & HPP', 'btn btn-secondary', 'boxes')}
           ${linkButton(`/products/${product.id}/edit`, 'Ubah produk', 'btn btn-primary', 'pencil')}
         `,
       })}
@@ -56,7 +63,12 @@ export const productDetailPage: PageRenderer = async (context) => {
 
       <div class="kpi-grid kpi-grid-3">
         ${kpiCard({ label: 'Harga jual aktif', value: formatRupiah(product.price), iconName: 'banknote' })}
-        ${kpiCard({ label: 'HPP aktif', value: formatRupiah(product.currentCost), iconName: 'package' })}
+        ${kpiCard({
+          label: 'HPP aktif',
+          value: formatRupiah(activeCost),
+          iconName: 'package',
+          hint: bom.usingBom ? 'Dihitung dari BOM' : 'HPP manual',
+        })}
         ${kpiCard({
           label: 'Margin kotor',
           value: margin === null ? 'N/A' : formatPercent(margin),
@@ -76,6 +88,7 @@ export const productDetailPage: PageRenderer = async (context) => {
               <div><dt>Kategori</dt><dd>${product.category ? escapeHtml(product.category) : '<span class="muted">Belum diisi</span>'}</dd></div>
               <div><dt>Varian</dt><dd>${product.variant ? escapeHtml(product.variant) : '<span class="muted">Belum diisi</span>'}</dd></div>
               <div><dt>Status</dt><dd>${badge(PRODUCT_STATUS_LABELS[product.status], PRODUCT_STATUS_TONES[product.status])}</dd></div>
+              <div><dt>Sumber HPP</dt><dd>${bom.usingBom ? `${badge('BOM', 'success')} ${formatNumber(bom.componentCount)} komponen` : badge('Manual', 'neutral')}</dd></div>
               <div><dt>Dibuat</dt><dd>${formatDateTime(product.createdAt)}</dd></div>
               <div><dt>Terakhir diubah</dt><dd>${formatDateTime(product.updatedAt)}</dd></div>
             </dl>
@@ -89,10 +102,65 @@ export const productDetailPage: PageRenderer = async (context) => {
               ${icon('shield-check')}
               <p>Pesanan menyimpan HPP snapshot masing-masing. Mengubah HPP produk tidak mengubah laba pesanan yang sudah tercatat.</p>
             </div>
-            <p class="inline-note">${icon('info')} Riwayat HPP dan harga jual dibuat otomatis setiap kali nilai berubah melalui formulir produk.</p>
+            <p class="inline-note">${icon('info')} ${
+              bom.usingBom
+                ? 'HPP aktif dihitung dari BOM. Perubahan komponen BOM atau biaya material mencatat riwayat HPP baru.'
+                : 'HPP masih diisi manual. Buat BOM untuk menghitung HPP dari material, tenaga kerja, dan overhead.'
+            }</p>
           `,
         })}
       </div>
+
+      ${card({
+        title: 'Struktur BOM & HPP',
+        subtitle: bom.usingBom
+          ? `${formatNumber(bom.componentCount)} komponen · total ${formatRupiah(bom.totalCost)} per unit`
+          : 'Belum ada komponen BOM',
+        actions: linkButton(
+          `/products/${product.id}/bom`,
+          bom.usingBom ? 'Kelola BOM' : 'Buat BOM',
+          'btn btn-secondary btn-sm',
+          'boxes',
+        ),
+        padded: bom.usingBom,
+        body: bom.usingBom
+          ? `
+            <div class="bom-breakdown">
+              <div><span>Material</span><strong>${formatRupiah(bom.materialCost)}</strong></div>
+              <div><span>Tenaga kerja</span><strong>${formatRupiah(bom.laborCost)}</strong></div>
+              <div><span>Overhead</span><strong>${formatRupiah(bom.overheadCost)}</strong></div>
+              <div class="bom-breakdown-total"><span>HPP per unit</span><strong>${formatRupiah(bom.totalCost)}</strong></div>
+            </div>
+            ${dataTable(
+              ['Komponen', 'Jenis', 'Kuantitas', 'Subtotal'],
+              bom.items.map((item) => [
+                escapeHtml(
+                  item.type === 'material'
+                    ? (item.materialName ?? 'Material tidak ditemukan')
+                    : (item.label ?? 'Komponen'),
+                ),
+                BOM_ITEM_TYPE_LABELS[item.type],
+                item.type === 'material'
+                  ? `${formatQuantity(item.quantity)} ${escapeHtml(item.materialUnit ?? '')}`
+                  : 'per unit',
+                formatRupiah(item.lineCost),
+              ]),
+            )}
+          `
+          : emptyState({
+              compact: true,
+              iconName: 'boxes',
+              title: 'HPP belum disusun dari BOM',
+              description:
+                'Buat BOM untuk menjumlahkan biaya material, tenaga kerja, dan overhead menjadi HPP per unit. HPP manual tetap dipakai sampai komponen pertama ditambahkan.',
+              action: linkButton(
+                `/products/${product.id}/bom`,
+                'Buat BOM',
+                'btn btn-primary btn-sm',
+                'plus',
+              ),
+            }),
+      })}
 
       ${card({
         title: 'Riwayat HPP',
