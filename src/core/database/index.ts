@@ -5,6 +5,7 @@ import { openWebDatabase } from './sqljs';
 import migration001 from '../../../database/migrations/001_initial.sql?raw';
 import migration002 from '../../../database/migrations/002_production.sql?raw';
 import migration003 from '../../../database/migrations/003_bom.sql?raw';
+import migration004 from '../../../database/migrations/004_cash.sql?raw';
 import { nowIso } from '@/core/utils/date';
 
 interface Migration {
@@ -28,6 +29,11 @@ export const MIGRATIONS: Migration[] = [
     version: 3,
     name: 'bom',
     sql: migration003,
+  },
+  {
+    version: 4,
+    name: 'cash',
+    sql: migration004,
   },
 ];
 

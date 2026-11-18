@@ -12,8 +12,10 @@ import { escapeAttr, escapeHtml } from '@/components/ui/dom';
 import { icon, refreshIcons } from '@/components/ui/icons';
 import {
   applyFormErrors,
+  badge,
   bindPagination,
   card,
+  checkboxField,
   confirmDialog,
   dataTable,
   emptyState,
@@ -24,6 +26,7 @@ import {
   loadingBlock,
   pageHeader,
   paginationBar,
+  readCheckbox,
   readMoney,
   readOptionalText,
   readText,
@@ -39,6 +42,7 @@ import {
 } from '@/components/ui/filters';
 import { navigateQuery, readPositiveInt, renderPageError } from '@/app/pageUtils';
 import type { OperationalExpenseFormInput } from '@/core/services/operationalExpenseService';
+import { cashAccountChoices } from './cashUi';
 
 function addExpenseHref(storeId: string | null): string {
   const params = new URLSearchParams({ expenseDate: todayJakarta() });
@@ -94,6 +98,9 @@ export const expenseListPage: PageRenderer = async (context) => {
       EXPENSE_CATEGORY_LABELS[expense.category],
       `<span class="table-strong">${escapeHtml(expense.description)}</span>${expense.receiptNote ? `<span class="table-sub">${escapeHtml(expense.receiptNote)}</span>` : ''}`,
       formatRupiah(expense.amount),
+      `${badge(expense.isPaid ? 'Dibayar' : 'Belum dibayar', expense.isPaid ? 'success' : 'warning')}${
+        expense.accountName ? `<span class="table-sub">${escapeHtml(expense.accountName)}</span>` : ''
+      }`,
       `<div class="table-actions">
         <a class="btn btn-ghost btn-sm" href="#/finance/expenses/${expense.id}/edit">Ubah</a>
         <button type="button" class="btn btn-ghost btn-icon" data-delete-expense="${escapeAttr(expense.id)}" aria-label="Hapus biaya" title="Hapus biaya">${icon('trash')}</button>
@@ -143,7 +150,7 @@ export const expenseListPage: PageRenderer = async (context) => {
           ? card({
               padded: false,
               body: dataTable(
-                ['Tanggal', 'Toko', 'Kategori', 'Deskripsi', 'Nominal', ''],
+                ['Tanggal', 'Toko', 'Kategori', 'Deskripsi', 'Nominal', 'Pembayaran', ''],
                 rows,
               ),
             })
@@ -214,9 +221,10 @@ export const expenseFormPage: PageRenderer = async (context) => {
   root.innerHTML = loadingBlock(isEdit ? 'Memuat biaya…' : 'Menyiapkan formulir…');
 
   try {
-    const [stores, expense] = await Promise.all([
+    const [stores, expense, cashAccounts] = await Promise.all([
       services.storeService.listAll(),
       id ? services.expenseService.get(id) : Promise.resolve<OperationalExpenseListItem | null>(null),
+      services.cashService.listForSelect(),
     ]);
     if (context.signal.aborted) return;
     context.setTitle(isEdit ? 'Ubah biaya operasional' : 'Biaya operasional baru');
@@ -286,6 +294,15 @@ export const expenseFormPage: PageRenderer = async (context) => {
               idPrefix: 'expense',
             })}
             ${formField({
+              name: 'accountId',
+              label: 'Rekening sumber dana',
+              type: 'select',
+              value: expense?.accountId ?? '',
+              options: cashAccountChoices(cashAccounts, expense?.accountId ?? null),
+              help: 'Wajib dipilih jika biaya sudah dibayar. Saldo rekening akan berkurang otomatis.',
+              idPrefix: 'expense',
+            })}
+            ${formField({
               name: 'description',
               label: 'Deskripsi',
               value: expense?.description ?? '',
@@ -305,6 +322,13 @@ export const expenseFormPage: PageRenderer = async (context) => {
               span: true,
             })}
           </div>
+          ${checkboxField({
+            name: 'isPaid',
+            label: 'Biaya sudah dibayar',
+            description: 'Centang jika uang sudah keluar. Saldo rekening sumber dana akan berkurang.',
+            checked: expense?.isPaid ?? false,
+            idPrefix: 'expense',
+          })}
         </div>
 
         ${formActions(isEdit ? 'Simpan perubahan' : 'Simpan biaya', {
@@ -331,6 +355,8 @@ export const expenseFormPage: PageRenderer = async (context) => {
           amount: readMoney(form, 'amount', 'Nominal', { required: true }),
           description: readText(form, 'description'),
           receiptNote: readOptionalText(form, 'receiptNote'),
+          accountId: readText(form, 'accountId') || null,
+          isPaid: readCheckbox(form, 'isPaid'),
         };
         if (input.amount <= 0) {
           throw new ValidationError('Nominal biaya harus lebih dari 0.', {

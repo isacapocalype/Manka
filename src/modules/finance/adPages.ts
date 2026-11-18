@@ -17,6 +17,7 @@ import {
   badge,
   bindPagination,
   card,
+  checkboxField,
   confirmDialog,
   dataTable,
   emptyState,
@@ -28,6 +29,7 @@ import {
   loadingBlock,
   pageHeader,
   paginationBar,
+  readCheckbox,
   readMoney,
   readOptionalInteger,
   readOptionalMoney,
@@ -44,6 +46,7 @@ import {
   storeSelectOptions,
 } from '@/components/ui/filters';
 import { navigateQuery, readPositiveInt, renderPageError } from '@/app/pageUtils';
+import { cashAccountChoices } from './cashUi';
 
 function addCampaignHref(): string {
   return '/finance/ads/new';
@@ -641,7 +644,7 @@ export const adExpenseListPage: PageRenderer = async (context) => {
           ? card({
               padded: false,
               body: dataTable(
-                ['Tanggal', 'Kampanye', 'Toko', 'Biaya', 'Impression', 'Click', 'Pesanan', 'Omzet atribusi', 'ROAS', 'ACOS', ''],
+                ['Tanggal', 'Kampanye', 'Toko', 'Biaya', 'Pembayaran', 'Impression', 'Click', 'Pesanan', 'Omzet atribusi', 'ROAS', 'ACOS', ''],
                 expensePage.items.map((expense) => {
                   const roas =
                     expense.attributedRevenue !== null && expense.amount > 0
@@ -656,6 +659,9 @@ export const adExpenseListPage: PageRenderer = async (context) => {
                     `<a class="table-link" href="#/finance/ads/${expense.campaignId}">${escapeHtml(expense.campaignName)}</a><span class="table-sub">${AD_PLATFORM_LABELS[expense.platform]}</span>`,
                     expense.storeName ? escapeHtml(expense.storeName) : '<span class="badge badge-primary">Bersama</span>',
                     `<span class="table-strong">${formatRupiah(expense.amount)}</span>`,
+                    `${badge(expense.isPaid ? 'Dibayar' : 'Belum dibayar', expense.isPaid ? 'success' : 'warning')}${
+                      expense.accountName ? `<span class="table-sub">${escapeHtml(expense.accountName)}</span>` : ''
+                    }`,
                     expense.impressions === null ? '—' : formatNumber(expense.impressions),
                     expense.clicks === null ? '—' : formatNumber(expense.clicks),
                     expense.attributedOrders === null ? '—' : formatNumber(expense.attributedOrders),
@@ -734,9 +740,10 @@ export const adExpenseFormPage: PageRenderer = async (context) => {
   root.innerHTML = loadingBlock(isEdit ? 'Memuat biaya iklan…' : 'Menyiapkan formulir…');
 
   try {
-    const [campaigns, expense] = await Promise.all([
+    const [campaigns, expense, cashAccounts] = await Promise.all([
       services.advertisingService.listCampaigns(),
       id ? services.advertisingService.getExpense(id) : Promise.resolve<AdvertisingExpenseListItem | null>(null),
+      services.cashService.listForSelect(),
     ]);
     if (context.signal.aborted) return;
     context.setTitle(isEdit ? 'Ubah biaya iklan' : 'Biaya iklan baru');
@@ -819,6 +826,15 @@ export const adExpenseFormPage: PageRenderer = async (context) => {
               idPrefix: 'ad-expense',
             })}
             ${formField({
+              name: 'accountId',
+              label: 'Rekening sumber dana',
+              type: 'select',
+              value: expense?.accountId ?? '',
+              options: cashAccountChoices(cashAccounts, expense?.accountId ?? null),
+              help: 'Wajib dipilih jika biaya sudah dibayar. Saldo rekening akan berkurang otomatis.',
+              idPrefix: 'ad-expense',
+            })}
+            ${formField({
               name: 'impressions',
               label: 'Impression',
               type: 'integer',
@@ -865,6 +881,13 @@ export const adExpenseFormPage: PageRenderer = async (context) => {
               span: true,
             })}
           </div>
+          ${checkboxField({
+            name: 'isPaid',
+            label: 'Biaya sudah dibayar',
+            description: 'Centang jika uang sudah keluar. Saldo rekening sumber dana akan berkurang.',
+            checked: expense?.isPaid ?? false,
+            idPrefix: 'ad-expense',
+          })}
           <div class="form-info">
             ${icon('info')}
             <p>ROAS = omzet teratribusi ÷ biaya iklan. ACOS = biaya iklan ÷ omzet teratribusi × 100%. Keduanya N/A bila omzet teratribusi tidak diisi.</p>
@@ -897,6 +920,8 @@ export const adExpenseFormPage: PageRenderer = async (context) => {
           attributedOrders: readOptionalInteger(form, 'attributedOrders', 'Pesanan teratribusi'),
           attributedRevenue: readOptionalMoney(form, 'attributedRevenue', 'Omzet teratribusi'),
           notes: readOptionalText(form, 'notes'),
+          accountId: readText(form, 'accountId') || null,
+          isPaid: readCheckbox(form, 'isPaid'),
         };
         if (isEdit && id) {
           await services.advertisingService.updateExpense(id, input);

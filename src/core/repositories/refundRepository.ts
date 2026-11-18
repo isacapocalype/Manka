@@ -31,6 +31,7 @@ export interface RefundWriteData {
   reason: string;
   status: RefundStatus;
   notes: string | null;
+  accountId: string | null;
 }
 
 function toOrderStatus(value: string): OrderStatus {
@@ -49,19 +50,23 @@ function mapRefund(row: SqlRow): RefundListItem {
     reason: getString(row, 'reason'),
     status: getString(row, 'status') as RefundStatus,
     notes: getNullableString(row, 'notes'),
+    accountId: getNullableString(row, 'account_id'),
     createdAt: getString(row, 'created_at'),
     updatedAt: getString(row, 'updated_at'),
     storeName: getString(row, 'store_name'),
     marketplaceOrderId: getString(row, 'marketplace_order_id'),
     orderStatus: toOrderStatus(getString(row, 'order_status')),
+    accountName: getNullableString(row, 'account_name'),
   };
 }
 
 const REFUND_SELECT = `
-  SELECT r.*, s.name AS store_name, o.marketplace_order_id AS marketplace_order_id, o.status AS order_status
+  SELECT r.*, s.name AS store_name, o.marketplace_order_id AS marketplace_order_id,
+    o.status AS order_status, ca.name AS account_name
   FROM refunds r
   JOIN stores s ON s.id = r.store_id
   JOIN orders o ON o.id = r.order_id
+  LEFT JOIN cash_accounts ca ON ca.id = r.account_id
 `;
 
 export class RefundRepository {
@@ -126,8 +131,8 @@ export class RefundRepository {
     const id = createId();
     const timestamp = nowIso();
     await (tx ?? this.db).execute(
-      `INSERT INTO refunds (id, store_id, order_id, settlement_id, refund_date, amount, quantity, reason, status, notes, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+      `INSERT INTO refunds (id, store_id, order_id, settlement_id, refund_date, amount, quantity, reason, status, notes, account_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         id,
         data.storeId,
@@ -139,6 +144,7 @@ export class RefundRepository {
         data.reason,
         data.status,
         data.notes,
+        data.accountId,
         timestamp,
         timestamp,
       ],
@@ -146,10 +152,10 @@ export class RefundRepository {
     return id;
   }
 
-  async update(id: string, data: RefundWriteData): Promise<void> {
-    await this.db.execute(
+  async update(id: string, data: RefundWriteData, tx?: SqlExecutor): Promise<void> {
+    await (tx ?? this.db).execute(
       `UPDATE refunds SET store_id = ?, order_id = ?, settlement_id = ?, refund_date = ?, amount = ?, quantity = ?,
-        reason = ?, status = ?, notes = ?, updated_at = ?
+        reason = ?, status = ?, notes = ?, account_id = ?, updated_at = ?
        WHERE id = ?;`,
       [
         data.storeId,
@@ -161,14 +167,15 @@ export class RefundRepository {
         data.reason,
         data.status,
         data.notes,
+        data.accountId,
         nowIso(),
         id,
       ],
     );
   }
 
-  async delete(id: string): Promise<void> {
-    await this.db.execute('DELETE FROM refunds WHERE id = ?;', [id]);
+  async delete(id: string, tx?: SqlExecutor): Promise<void> {
+    await (tx ?? this.db).execute('DELETE FROM refunds WHERE id = ?;', [id]);
   }
 
   async countBySettlement(settlementId: string): Promise<number> {

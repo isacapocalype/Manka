@@ -16,6 +16,7 @@ import { BackupRepository } from '@/core/repositories/backupRepository';
 import { WorkOrderRepository } from '@/core/repositories/workOrderRepository';
 import { MaterialRepository } from '@/core/repositories/materialRepository';
 import { ProductBomRepository } from '@/core/repositories/productBomRepository';
+import { CashRepository } from '@/core/repositories/cashRepository';
 import { StoreService } from './storeService';
 import { ProductService } from './productService';
 import { OrderService } from './orderService';
@@ -34,6 +35,7 @@ import { DataHealthService } from './dataHealthService';
 import { ProductionService } from './productionService';
 import { MaterialService } from './materialService';
 import { BomService } from './bomService';
+import { CashService } from './cashService';
 
 export interface AppServices {
   db: Database;
@@ -53,6 +55,7 @@ export interface AppServices {
   workOrders: WorkOrderRepository;
   materials: MaterialRepository;
   productBom: ProductBomRepository;
+  cash: CashRepository;
   storeService: StoreService;
   productService: ProductService;
   orderService: OrderService;
@@ -71,6 +74,7 @@ export interface AppServices {
   productionService: ProductionService;
   materialService: MaterialService;
   bomService: BomService;
+  cashService: CashService;
 }
 
 export function createAppServices(
@@ -93,15 +97,17 @@ export function createAppServices(
   const workOrders = new WorkOrderRepository(db);
   const materials = new MaterialRepository(db);
   const productBom = new ProductBomRepository(db);
+  const cash = new CashRepository(db);
 
   const storeService = new StoreService(stores, audit, encryption);
   const productService = new ProductService(db, products, productBom, audit);
   const orderService = new OrderService(db, orders, products, stores, audit);
+  const cashService = new CashService(db, cash, audit);
   const feeService = new FeeService(fees, stores, orders, audit);
-  const advertisingService = new AdvertisingService(advertising, stores, audit);
-  const expenseService = new OperationalExpenseService(expenses, stores, audit);
-  const refundService = new RefundService(refunds, orders, settlements, audit);
-  const settlementService = new SettlementService(settlements, stores, audit);
+  const advertisingService = new AdvertisingService(db, advertising, stores, audit, cashService);
+  const expenseService = new OperationalExpenseService(db, expenses, stores, audit, cashService);
+  const refundService = new RefundService(db, refunds, orders, settlements, audit, cashService);
+  const settlementService = new SettlementService(db, settlements, stores, audit, cashService);
   const importService = new OrderImportService(
     db,
     orders,
@@ -121,7 +127,7 @@ export function createAppServices(
     expenses,
     settlements,
   );
-  const dashboardService = new DashboardService(financeService, stores, orders);
+  const dashboardService = new DashboardService(financeService, stores, orders, cashService);
   const productProfitService = new ProductProfitService(orders, fees, refunds);
   const reportService = new ReportService(financeService, stores, productProfitService);
   const dataHealthService = new DataHealthService(orders, products, settlements, settings);
@@ -147,6 +153,7 @@ export function createAppServices(
     workOrders,
     materials,
     productBom,
+    cash,
     storeService,
     productService,
     orderService,
@@ -165,6 +172,7 @@ export function createAppServices(
     productionService,
     materialService,
     bomService,
+    cashService,
   };
 }
 

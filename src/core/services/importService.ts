@@ -751,6 +751,7 @@ export class OrderImportService {
               reason: 'Refund dari import marketplace',
               status: 'completed',
               notes: 'Dibuat dari import pesanan',
+              accountId: null,
             },
             tx,
           );

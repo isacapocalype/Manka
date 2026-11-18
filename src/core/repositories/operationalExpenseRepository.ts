@@ -7,7 +7,7 @@ import type {
 } from '@/types/entities';
 import { createId } from '@/core/utils/id';
 import { nowIso } from '@/core/utils/date';
-import { getNullableString, getNumber, getString } from './rowUtils';
+import { getBoolean, getNullableString, getNumber, getString } from './rowUtils';
 import type { FinanceOperationalExpense } from '@/types/finance';
 
 export interface OperationalExpenseFilters {
@@ -27,6 +27,8 @@ export interface OperationalExpenseWriteData {
   amount: number;
   description: string;
   receiptNote: string | null;
+  accountId: string | null;
+  isPaid: boolean;
 }
 
 function mapExpense(row: SqlRow): OperationalExpenseListItem {
@@ -38,16 +40,20 @@ function mapExpense(row: SqlRow): OperationalExpenseListItem {
     amount: getNumber(row, 'amount'),
     description: getString(row, 'description'),
     receiptNote: getNullableString(row, 'receipt_note'),
+    accountId: getNullableString(row, 'account_id'),
+    isPaid: getBoolean(row, 'is_paid'),
     createdAt: getString(row, 'created_at'),
     updatedAt: getString(row, 'updated_at'),
     storeName: getNullableString(row, 'store_name'),
+    accountName: getNullableString(row, 'account_name'),
   };
 }
 
 const EXPENSE_SELECT = `
-  SELECT oe.*, s.name AS store_name
+  SELECT oe.*, s.name AS store_name, ca.name AS account_name
   FROM operational_expenses oe
   LEFT JOIN stores s ON s.id = oe.store_id
+  LEFT JOIN cash_accounts ca ON ca.id = oe.account_id
 `;
 
 export class OperationalExpenseRepository {
@@ -107,8 +113,8 @@ export class OperationalExpenseRepository {
     const id = createId();
     const timestamp = nowIso();
     await (tx ?? this.db).execute(
-      `INSERT INTO operational_expenses (id, store_id, expense_date, category, amount, description, receipt_note, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+      `INSERT INTO operational_expenses (id, store_id, expense_date, category, amount, description, receipt_note, account_id, is_paid, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         id,
         data.storeId,
@@ -117,6 +123,8 @@ export class OperationalExpenseRepository {
         data.amount,
         data.description,
         data.receiptNote,
+        data.accountId,
+        data.isPaid ? 1 : 0,
         timestamp,
         timestamp,
       ],
@@ -124,9 +132,10 @@ export class OperationalExpenseRepository {
     return id;
   }
 
-  async update(id: string, data: OperationalExpenseWriteData): Promise<void> {
-    await this.db.execute(
-      `UPDATE operational_expenses SET store_id = ?, expense_date = ?, category = ?, amount = ?, description = ?, receipt_note = ?, updated_at = ?
+  async update(id: string, data: OperationalExpenseWriteData, tx?: SqlExecutor): Promise<void> {
+    await (tx ?? this.db).execute(
+      `UPDATE operational_expenses SET store_id = ?, expense_date = ?, category = ?, amount = ?, description = ?,
+        receipt_note = ?, account_id = ?, is_paid = ?, updated_at = ?
        WHERE id = ?;`,
       [
         data.storeId,
@@ -135,14 +144,16 @@ export class OperationalExpenseRepository {
         data.amount,
         data.description,
         data.receiptNote,
+        data.accountId,
+        data.isPaid ? 1 : 0,
         nowIso(),
         id,
       ],
     );
   }
 
-  async delete(id: string): Promise<void> {
-    await this.db.execute('DELETE FROM operational_expenses WHERE id = ?;', [id]);
+  async delete(id: string, tx?: SqlExecutor): Promise<void> {
+    await (tx ?? this.db).execute('DELETE FROM operational_expenses WHERE id = ?;', [id]);
   }
 
   async findForFinance(from: string, to: string): Promise<FinanceOperationalExpense[]> {

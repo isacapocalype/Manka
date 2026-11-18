@@ -264,6 +264,9 @@ export interface AdvertisingExpense {
   attributedOrders: number | null;
   attributedRevenue: Money | null;
   notes: string | null;
+  /** Rekening kas sumber dana. Wajib jika biaya sudah dibayar. */
+  accountId: string | null;
+  isPaid: boolean;
   createdAt: IsoDateTime;
 }
 
@@ -276,6 +279,8 @@ export interface AdvertisingExpenseInput {
   attributedOrders?: number | null;
   attributedRevenue?: Money | null;
   notes?: string | null;
+  accountId?: string | null;
+  isPaid?: boolean;
 }
 
 export interface AdvertisingCampaignSummary extends AdvertisingCampaign {
@@ -297,12 +302,16 @@ export interface OperationalExpense {
   amount: Money;
   description: string;
   receiptNote: string | null;
+  /** Rekening kas sumber dana. Wajib jika biaya sudah dibayar. */
+  accountId: string | null;
+  isPaid: boolean;
   createdAt: IsoDateTime;
   updatedAt: IsoDateTime;
 }
 
 export interface OperationalExpenseListItem extends OperationalExpense {
   storeName: string | null;
+  accountName: string | null;
 }
 
 export interface OperationalExpenseInput {
@@ -312,6 +321,8 @@ export interface OperationalExpenseInput {
   amount: Money;
   description: string;
   receiptNote?: string | null;
+  accountId?: string | null;
+  isPaid?: boolean;
 }
 
 export interface Refund {
@@ -325,6 +336,8 @@ export interface Refund {
   reason: string;
   status: RefundStatus;
   notes: string | null;
+  /** Rekening kas untuk refund yang tidak termasuk pencairan settlement. */
+  accountId: string | null;
   createdAt: IsoDateTime;
   updatedAt: IsoDateTime;
 }
@@ -333,6 +346,7 @@ export interface RefundListItem extends Refund {
   storeName: string;
   marketplaceOrderId: string;
   orderStatus: OrderStatus;
+  accountName: string | null;
 }
 
 export interface RefundInput {
@@ -344,6 +358,7 @@ export interface RefundInput {
   reason: string;
   status: RefundStatus;
   notes?: string | null;
+  accountId?: string | null;
 }
 
 export interface Settlement {
@@ -356,12 +371,15 @@ export interface Settlement {
   totalPayout: Money;
   status: SettlementStatus;
   notes: string | null;
+  /** Rekening tujuan pencairan. Wajib saat status diterima. */
+  accountId: string | null;
   createdAt: IsoDateTime;
   updatedAt: IsoDateTime;
 }
 
 export interface SettlementListItem extends Settlement {
   storeName: string;
+  accountName: string | null;
 }
 
 export interface SettlementInput {
@@ -373,6 +391,7 @@ export interface SettlementInput {
   totalPayout: Money;
   status: SettlementStatus;
   notes?: string | null;
+  accountId?: string | null;
 }
 
 export interface ImportBatch {

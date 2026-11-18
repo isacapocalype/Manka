@@ -119,6 +119,18 @@ export const dashboardPage: PageRenderer = async (context) => {
       : '';
 
     const healthIssues = health.checks.filter((item) => item.count > 0);
+    const cashCard = card({
+      title: 'Kas & pencairan',
+      subtitle: `${formatNumber(data.cash.accountCount)} rekening aktif/tidak aktif`,
+      actions: linkButton('/finance/cash', 'Buka kas', 'btn btn-ghost btn-sm', 'arrow-right'),
+      body: `
+        <div class="kpi-grid kpi-grid-3">
+          <div class="import-stat"><strong>${formatRupiah(data.cash.totalBalance)}</strong><span>Saldo kas saat ini</span></div>
+          <div class="import-stat import-stat-warning"><strong>${formatRupiah(data.cash.pendingSettlements.amount)}</strong><span>${formatNumber(data.cash.pendingSettlements.count)} settlement menunggu</span></div>
+          <div class="import-stat import-stat-warning"><strong>${formatRupiah(data.cash.unassignedSettlements.amount + data.cash.unlinkedRefunds.amount)}</strong><span>Dana belum tercatat</span></div>
+        </div>
+      `,
+    });
     const healthCard = card({
       title: 'Kesehatan data',
       subtitle:
@@ -238,6 +250,7 @@ export const dashboardPage: PageRenderer = async (context) => {
       ${filterBar}
       ${onboarding}
       ${kpiGrid}
+      ${hasStores ? cashCard : ''}
       ${hasStores ? healthCard : ''}
       ${hasStores && hasActivity && summary.hasEstimatedFees ? `<p class="inline-note note-warning">${icon('triangle-alert')} Sebagian biaya marketplace adalah estimasi. Laba operasional dapat berubah saat biaya aktual dicatat.</p>` : ''}
       ${activeStoreName && (summary.sharedAdvertisingSpend > 0 || summary.sharedOperationalExpenses > 0) ? `<p class="inline-note">${icon('info')} Biaya bersama tidak dialokasikan ke toko yang dipilih.</p>` : ''}

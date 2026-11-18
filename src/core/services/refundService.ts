@@ -4,11 +4,13 @@ import type {
   PagedResult,
   RefundStatus,
 } from '@/types/entities';
+import type { Database } from '@/core/database/types';
 import { REFUND_STATUSES } from '@/types/entities';
 import type { RefundFilters, RefundRepository, RefundWriteData } from '@/core/repositories/refundRepository';
 import type { OrderRepository } from '@/core/repositories/orderRepository';
 import type { SettlementRepository } from '@/core/repositories/settlementRepository';
 import type { AuditRepository } from '@/core/repositories/auditRepository';
+import type { CashService } from './cashService';
 import {
   NotFoundError,
   ValidationError,
@@ -34,21 +36,27 @@ export interface RefundResultInfo {
 }
 
 export class RefundService {
+  private readonly db: Database;
   private readonly refunds: RefundRepository;
   private readonly orders: OrderRepository;
   private readonly settlements: SettlementRepository;
   private readonly audit: AuditRepository;
+  private readonly cash: CashService;
 
   constructor(
+    db: Database,
     refunds: RefundRepository,
     orders: OrderRepository,
     settlements: SettlementRepository,
     audit: AuditRepository,
+    cash: CashService,
   ) {
+    this.db = db;
     this.refunds = refunds;
     this.orders = orders;
     this.settlements = settlements;
     this.audit = audit;
+    this.cash = cash;
   }
 
   list(filters: RefundFilters): Promise<PagedResult<RefundListItem>> {
@@ -70,7 +78,7 @@ export class RefundService {
   private async normalize(
     input: RefundInput,
     excludeRefundId?: string,
-  ): Promise<RefundWriteData> {
+  ): Promise<{ data: RefundWriteData; orderNumber: string }> {
     const orderId = requiredText(input.orderId, 'Pesanan', 'orderId');
     const order = await this.orders.getDetail(orderId);
     if (!order) {
@@ -130,48 +138,82 @@ export class RefundService {
         });
       }
     }
+    const accountId = optionalText(input.accountId, 100);
+    if (accountId) {
+      await this.cash.requireAccount(accountId, 'accountId');
+    }
 
     return {
-      orderId: order.id,
-      storeId: order.storeId,
-      settlementId,
-      refundDate: input.refundDate,
-      amount,
-      quantity,
-      reason: requiredText(input.reason, 'Alasan refund', 'reason'),
-      status: validateStatus(input.status),
-      notes: optionalText(input.notes, 1000),
+      data: {
+        orderId: order.id,
+        storeId: order.storeId,
+        settlementId,
+        refundDate: input.refundDate,
+        amount,
+        quantity,
+        reason: requiredText(input.reason, 'Alasan refund', 'reason'),
+        status: validateStatus(input.status),
+        notes: optionalText(input.notes, 1000),
+        accountId,
+      },
+      orderNumber: order.marketplaceOrderId,
     };
   }
 
   async create(input: RefundInput): Promise<RefundListItem> {
-    const data = await this.normalize(input);
-    const id = await this.refunds.create(data);
+    const { data, orderNumber } = await this.normalize(input);
+    const id = await this.db.transaction(async (tx) => {
+      const refundId = await this.refunds.create(data, tx);
+      await this.cash.syncRefund(
+        refundId,
+        {
+          ...data,
+          description: `Refund #${orderNumber}`,
+        },
+        tx,
+      );
+      return refundId;
+    });
     await this.audit.log('create', 'refund', id, {
       orderId: data.orderId,
       amount: data.amount,
       status: data.status,
       date: data.refundDate,
+      accountId: data.accountId,
     });
     return this.get(id);
   }
 
   async update(id: string, input: RefundInput): Promise<RefundListItem> {
     await this.get(id);
-    const data = await this.normalize(input, id);
-    await this.refunds.update(id, data);
+    const { data, orderNumber } = await this.normalize(input, id);
+    await this.db.transaction(async (tx) => {
+      await this.refunds.update(id, data, tx);
+      await this.cash.syncRefund(
+        id,
+        {
+          ...data,
+          description: `Refund #${orderNumber}`,
+        },
+        tx,
+      );
+    });
     await this.audit.log('update', 'refund', id, {
       orderId: data.orderId,
       amount: data.amount,
       status: data.status,
       date: data.refundDate,
+      accountId: data.accountId,
     });
     return this.get(id);
   }
 
   async delete(id: string): Promise<void> {
     await this.get(id);
-    await this.refunds.delete(id);
+    await this.db.transaction(async (tx) => {
+      await this.cash.removeSourceEntries('refund', id, tx);
+      await this.refunds.delete(id, tx);
+    });
     await this.audit.log('delete', 'refund', id);
   }
 }

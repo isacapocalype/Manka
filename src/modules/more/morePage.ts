@@ -73,6 +73,12 @@ const MAIN_LINKS: MoreLink[] = [
 
 const FINANCE_LINKS: MoreLink[] = [
   {
+    href: '/finance/cash',
+    label: 'Kas & rekening',
+    description: 'Saldo kas, bank, e-wallet, transfer, dan rekonsiliasi.',
+    iconName: 'landmark',
+  },
+  {
     href: '/finance/fees',
     label: 'Biaya marketplace',
     description: 'Potongan aktual dan estimasi.',

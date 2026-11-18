@@ -7,7 +7,7 @@ import type {
 } from '@/types/entities';
 import { createId } from '@/core/utils/id';
 import { nowIso } from '@/core/utils/date';
-import { getNullableNumber, getNullableString, getNumber, getString } from './rowUtils';
+import { getBoolean, getNullableNumber, getNullableString, getNumber, getString } from './rowUtils';
 import type { FinanceAdvertisingExpense } from '@/types/finance';
 
 export interface CampaignListItem extends AdvertisingCampaign {
@@ -24,6 +24,7 @@ export interface AdvertisingExpenseListItem extends AdvertisingExpense {
   platform: AdPlatform;
   storeId: string | null;
   storeName: string | null;
+  accountName: string | null;
 }
 
 export interface CampaignWriteData {
@@ -42,6 +43,8 @@ export interface AdExpenseWriteData {
   attributedOrders: number | null;
   attributedRevenue: number | null;
   notes: string | null;
+  accountId: string | null;
+  isPaid: boolean;
 }
 
 export interface AdExpenseFilters {
@@ -82,11 +85,14 @@ function mapExpense(row: SqlRow): AdvertisingExpenseListItem {
     attributedOrders: getNullableNumber(row, 'attributed_orders'),
     attributedRevenue: getNullableNumber(row, 'attributed_revenue'),
     notes: getNullableString(row, 'notes'),
+    accountId: getNullableString(row, 'account_id'),
+    isPaid: getBoolean(row, 'is_paid'),
     createdAt: getString(row, 'created_at'),
     campaignName: getString(row, 'campaign_name'),
     platform: getString(row, 'platform') as AdPlatform,
     storeId: getNullableString(row, 'store_id'),
     storeName: getNullableString(row, 'store_name'),
+    accountName: getNullableString(row, 'account_name'),
   };
 }
 
@@ -102,10 +108,12 @@ const CAMPAIGN_SELECT = `
 `;
 
 const EXPENSE_SELECT = `
-  SELECT ae.*, c.name AS campaign_name, c.platform AS platform, c.store_id AS store_id, s.name AS store_name
+  SELECT ae.*, c.name AS campaign_name, c.platform AS platform, c.store_id AS store_id,
+    s.name AS store_name, ca.name AS account_name
   FROM advertising_expenses ae
   JOIN advertising_campaigns c ON c.id = ae.campaign_id
   LEFT JOIN stores s ON s.id = c.store_id
+  LEFT JOIN cash_accounts ca ON ca.id = ae.account_id
 `;
 
 export class AdvertisingRepository {
@@ -214,8 +222,8 @@ export class AdvertisingRepository {
   async createExpense(data: AdExpenseWriteData, tx?: SqlExecutor): Promise<string> {
     const id = createId();
     await (tx ?? this.db).execute(
-      `INSERT INTO advertising_expenses (id, campaign_id, expense_date, amount, impressions, clicks, attributed_orders, attributed_revenue, notes, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+      `INSERT INTO advertising_expenses (id, campaign_id, expense_date, amount, impressions, clicks, attributed_orders, attributed_revenue, notes, account_id, is_paid, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         id,
         data.campaignId,
@@ -226,16 +234,18 @@ export class AdvertisingRepository {
         data.attributedOrders,
         data.attributedRevenue,
         data.notes,
+        data.accountId,
+        data.isPaid ? 1 : 0,
         nowIso(),
       ],
     );
     return id;
   }
 
-  async updateExpense(id: string, data: AdExpenseWriteData): Promise<void> {
-    await this.db.execute(
+  async updateExpense(id: string, data: AdExpenseWriteData, tx?: SqlExecutor): Promise<void> {
+    await (tx ?? this.db).execute(
       `UPDATE advertising_expenses SET campaign_id = ?, expense_date = ?, amount = ?, impressions = ?, clicks = ?,
-        attributed_orders = ?, attributed_revenue = ?, notes = ?
+        attributed_orders = ?, attributed_revenue = ?, notes = ?, account_id = ?, is_paid = ?
        WHERE id = ?;`,
       [
         data.campaignId,
@@ -246,13 +256,15 @@ export class AdvertisingRepository {
         data.attributedOrders,
         data.attributedRevenue,
         data.notes,
+        data.accountId,
+        data.isPaid ? 1 : 0,
         id,
       ],
     );
   }
 
-  async deleteExpense(id: string): Promise<void> {
-    await this.db.execute('DELETE FROM advertising_expenses WHERE id = ?;', [id]);
+  async deleteExpense(id: string, tx?: SqlExecutor): Promise<void> {
+    await (tx ?? this.db).execute('DELETE FROM advertising_expenses WHERE id = ?;', [id]);
   }
 
   async findForFinance(from: string, to: string): Promise<FinanceAdvertisingExpense[]> {

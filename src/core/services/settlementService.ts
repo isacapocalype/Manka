@@ -4,6 +4,7 @@ import type {
   SettlementListItem,
   SettlementStatus,
 } from '@/types/entities';
+import type { Database } from '@/core/database/types';
 import { SETTLEMENT_STATUSES } from '@/types/entities';
 import type {
   SettlementFilters,
@@ -12,6 +13,7 @@ import type {
 } from '@/core/repositories/settlementRepository';
 import type { StoreRepository } from '@/core/repositories/storeRepository';
 import type { AuditRepository } from '@/core/repositories/auditRepository';
+import type { CashService } from './cashService';
 import {
   ConflictError,
   NotFoundError,
@@ -33,18 +35,24 @@ function validateStatus(value: string): SettlementStatus {
 }
 
 export class SettlementService {
+  private readonly db: Database;
   private readonly settlements: SettlementRepository;
   private readonly stores: StoreRepository;
   private readonly audit: AuditRepository;
+  private readonly cash: CashService;
 
   constructor(
+    db: Database,
     settlements: SettlementRepository,
     stores: StoreRepository,
     audit: AuditRepository,
+    cash: CashService,
   ) {
+    this.db = db;
     this.settlements = settlements;
     this.stores = stores;
     this.audit = audit;
+    this.cash = cash;
   }
 
   list(filters: SettlementFilters): Promise<PagedResult<SettlementListItem>> {
@@ -78,6 +86,16 @@ export class SettlementService {
         settlementDate: 'Pilih tanggal settlement yang valid.',
       });
     }
+    const status = validateStatus(input.status);
+    const accountId = optionalText(input.accountId, 100);
+    if (accountId) {
+      await this.cash.requireAccount(accountId, 'accountId');
+    }
+    if (status === 'received' && !accountId) {
+      throw new ValidationError('Rekening tujuan wajib dipilih untuk settlement diterima.', {
+        accountId: 'Pilih rekening tujuan pencairan.',
+      });
+    }
     return {
       storeId,
       settlementNo,
@@ -85,8 +103,9 @@ export class SettlementService {
       grossSales: validateMoney(input.grossSales, 'Total penjualan', 'grossSales'),
       totalDeductions: validateMoney(input.totalDeductions, 'Total potongan', 'totalDeductions'),
       totalPayout: validateMoney(input.totalPayout, 'Total pencairan', 'totalPayout'),
-      status: validateStatus(input.status),
+      status,
       notes: optionalText(input.notes, 1000),
+      accountId,
     };
   }
 
@@ -105,11 +124,16 @@ export class SettlementService {
     const data = await this.normalize(input);
     await this.assertUnique(data.storeId, data.settlementNo);
     try {
-      const id = await this.settlements.create(data);
+      const id = await this.db.transaction(async (tx) => {
+        const settlementId = await this.settlements.create(data, tx);
+        await this.cash.syncSettlement(settlementId, data, tx);
+        return settlementId;
+      });
       await this.audit.log('create', 'settlement', id, {
         storeId: data.storeId,
         settlementNo: data.settlementNo,
         totalPayout: data.totalPayout,
+        accountId: data.accountId,
       });
       return this.get(id);
     } catch (error) {
@@ -125,11 +149,15 @@ export class SettlementService {
     const data = await this.normalize(input);
     await this.assertUnique(data.storeId, data.settlementNo, id);
     try {
-      await this.settlements.update(id, data);
+      await this.db.transaction(async (tx) => {
+        await this.settlements.update(id, data, tx);
+        await this.cash.syncSettlement(id, data, tx);
+      });
       await this.audit.log('update', 'settlement', id, {
         storeId: data.storeId,
         settlementNo: data.settlementNo,
         totalPayout: data.totalPayout,
+        accountId: data.accountId,
       });
       return this.get(id);
     } catch (error) {
@@ -142,7 +170,10 @@ export class SettlementService {
 
   async delete(id: string): Promise<void> {
     await this.get(id);
-    await this.settlements.delete(id);
+    await this.db.transaction(async (tx) => {
+      await this.cash.removeSourceEntries('settlement', id, tx);
+      await this.settlements.delete(id, tx);
+    });
     await this.audit.log('delete', 'settlement', id);
   }
 }

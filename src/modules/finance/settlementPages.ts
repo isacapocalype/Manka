@@ -43,6 +43,7 @@ import {
   storeSelectOptions,
 } from '@/components/ui/filters';
 import { navigateQuery, readPositiveInt, renderPageError } from '@/app/pageUtils';
+import { cashAccountChoices } from './cashUi';
 
 function addSettlementHref(storeId: string | null): string {
   const params = new URLSearchParams({ settlementDate: todayJakarta() });
@@ -103,6 +104,9 @@ export const settlementListPage: PageRenderer = async (context) => {
         SETTLEMENT_STATUS_LABELS[settlement.status],
         SETTLEMENT_STATUS_TONES[settlement.status],
       ),
+      settlement.accountName
+        ? escapeHtml(settlement.accountName)
+        : '<span class="muted">Belum ditautkan</span>',
       settlement.notes
         ? `<span class="table-note">${escapeHtml(settlement.notes)}</span>`
         : '<span class="muted">—</span>',
@@ -157,7 +161,7 @@ export const settlementListPage: PageRenderer = async (context) => {
           ? card({
               padded: false,
               body: dataTable(
-                ['Nomor / toko', 'Tanggal', 'Penjualan', 'Potongan', 'Pencairan', 'Status', 'Catatan', ''],
+                ['Nomor / toko', 'Tanggal', 'Penjualan', 'Potongan', 'Pencairan', 'Status', 'Rekening', 'Catatan', ''],
                 rows,
               ),
             })
@@ -236,9 +240,10 @@ export const settlementFormPage: PageRenderer = async (context) => {
   root.innerHTML = loadingBlock(isEdit ? 'Memuat settlement…' : 'Menyiapkan formulir…');
 
   try {
-    const [stores, settlement] = await Promise.all([
+    const [stores, settlement, cashAccounts] = await Promise.all([
       services.storeService.listAll(),
       id ? services.settlementService.get(id) : Promise.resolve<SettlementListItem | null>(null),
+      services.cashService.listForSelect(),
     ]);
     if (context.signal.aborted) return;
     context.setTitle(isEdit ? 'Ubah settlement' : 'Settlement baru');
@@ -326,6 +331,15 @@ export const settlementFormPage: PageRenderer = async (context) => {
               idPrefix: 'settlement',
             })}
             ${formField({
+              name: 'accountId',
+              label: 'Rekening tujuan',
+              type: 'select',
+              value: settlement?.accountId ?? '',
+              options: cashAccountChoices(cashAccounts, settlement?.accountId ?? null),
+              help: 'Wajib dipilih saat status diterima. Dana akan masuk ke rekening ini.',
+              idPrefix: 'settlement',
+            })}
+            ${formField({
               name: 'grossSales',
               label: 'Total penjualan',
               type: 'money',
@@ -396,6 +410,7 @@ export const settlementFormPage: PageRenderer = async (context) => {
           totalPayout: readMoney(form, 'totalPayout', 'Total pencairan', { required: true }),
           status: readText(form, 'status') as SettlementStatus,
           notes: readOptionalText(form, 'notes'),
+          accountId: readText(form, 'accountId') || null,
         };
         if (isEdit && id) {
           await services.settlementService.update(id, input);

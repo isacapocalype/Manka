@@ -5,6 +5,7 @@ import type {
   AdvertisingExpenseInput,
   PagedResult,
 } from '@/types/entities';
+import type { Database } from '@/core/database/types';
 import { AD_PLATFORMS } from '@/types/entities';
 import type {
   AdExpenseFilters,
@@ -15,6 +16,7 @@ import type {
 } from '@/core/repositories/advertisingRepository';
 import type { StoreRepository } from '@/core/repositories/storeRepository';
 import type { AuditRepository } from '@/core/repositories/auditRepository';
+import type { CashService } from './cashService';
 import {
   NotFoundError,
   ValidationError,
@@ -36,18 +38,24 @@ function validatePlatform(value: string): (typeof AD_PLATFORMS)[number] {
 }
 
 export class AdvertisingService {
+  private readonly db: Database;
   private readonly ads: AdvertisingRepository;
   private readonly stores: StoreRepository;
   private readonly audit: AuditRepository;
+  private readonly cash: CashService;
 
   constructor(
+    db: Database,
     ads: AdvertisingRepository,
     stores: StoreRepository,
     audit: AuditRepository,
+    cash: CashService,
   ) {
+    this.db = db;
     this.ads = ads;
     this.stores = stores;
     this.audit = audit;
+    this.cash = cash;
   }
 
   async listCampaigns(storeId?: string | null): Promise<AdvertisingCampaignSummary[]> {
@@ -140,7 +148,9 @@ export class AdvertisingService {
     return expense;
   }
 
-  private async normalizeExpense(input: AdvertisingExpenseInput): Promise<AdExpenseWriteData> {
+  private async normalizeExpense(
+    input: AdvertisingExpenseInput,
+  ): Promise<{ data: AdExpenseWriteData; campaignName: string }> {
     const campaign = await this.ads.getCampaignBase(input.campaignId);
     if (!campaign) {
       throw new ValidationError('Kampanye iklan tidak ditemukan.', {
@@ -168,44 +178,87 @@ export class AdvertisingService {
       'Omzet teratribusi',
       'attributedRevenue',
     );
+    const accountId = optionalText(input.accountId, 100);
+    if (accountId) {
+      await this.cash.requireAccount(accountId, 'accountId');
+    }
+    const isPaid = input.isPaid ?? false;
+    if (isPaid && !accountId) {
+      throw new ValidationError('Rekening kas wajib dipilih untuk biaya iklan yang sudah dibayar.', {
+        accountId: 'Pilih rekening sumber dana.',
+      });
+    }
     return {
-      campaignId: campaign.id,
-      expenseDate: input.expenseDate,
-      amount: validateMoney(input.amount, 'Pengeluaran iklan', 'amount'),
-      impressions,
-      clicks,
-      attributedOrders,
-      attributedRevenue,
-      notes: optionalText(input.notes, 1000),
+      data: {
+        campaignId: campaign.id,
+        expenseDate: input.expenseDate,
+        amount: validateMoney(input.amount, 'Pengeluaran iklan', 'amount'),
+        impressions,
+        clicks,
+        attributedOrders,
+        attributedRevenue,
+        notes: optionalText(input.notes, 1000),
+        accountId,
+        isPaid,
+      },
+      campaignName: campaign.name,
     };
   }
 
   async createExpense(input: AdvertisingExpenseInput): Promise<AdvertisingExpenseListItem> {
-    const data = await this.normalizeExpense(input);
-    const id = await this.ads.createExpense(data);
+    const { data, campaignName } = await this.normalizeExpense(input);
+    const id = await this.db.transaction(async (tx) => {
+      const expenseId = await this.ads.createExpense(data, tx);
+      await this.cash.syncAdvertisingExpense(
+        expenseId,
+        {
+          ...data,
+          description: `Biaya iklan ${campaignName}`,
+        },
+        tx,
+      );
+      return expenseId;
+    });
     await this.audit.log('create', 'advertising_expense', id, {
       campaignId: data.campaignId,
       amount: data.amount,
       date: data.expenseDate,
+      isPaid: data.isPaid,
+      accountId: data.accountId,
     });
     return this.getExpense(id);
   }
 
   async updateExpense(id: string, input: AdvertisingExpenseInput): Promise<AdvertisingExpenseListItem> {
     await this.getExpense(id);
-    const data = await this.normalizeExpense(input);
-    await this.ads.updateExpense(id, data);
+    const { data, campaignName } = await this.normalizeExpense(input);
+    await this.db.transaction(async (tx) => {
+      await this.ads.updateExpense(id, data, tx);
+      await this.cash.syncAdvertisingExpense(
+        id,
+        {
+          ...data,
+          description: `Biaya iklan ${campaignName}`,
+        },
+        tx,
+      );
+    });
     await this.audit.log('update', 'advertising_expense', id, {
       campaignId: data.campaignId,
       amount: data.amount,
       date: data.expenseDate,
+      isPaid: data.isPaid,
+      accountId: data.accountId,
     });
     return this.getExpense(id);
   }
 
   async deleteExpense(id: string): Promise<void> {
     await this.getExpense(id);
-    await this.ads.deleteExpense(id);
+    await this.db.transaction(async (tx) => {
+      await this.cash.removeSourceEntries('advertising_expense', id, tx);
+      await this.ads.deleteExpense(id, tx);
+    });
     await this.audit.log('delete', 'advertising_expense', id);
   }
 

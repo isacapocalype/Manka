@@ -43,6 +43,7 @@ import {
   storeSelectOptions,
 } from '@/components/ui/filters';
 import { navigateQuery, readPositiveInt, renderPageError } from '@/app/pageUtils';
+import { cashAccountChoices } from './cashUi';
 
 interface OrderChoice {
   id: string;
@@ -158,6 +159,9 @@ export const refundListPage: PageRenderer = async (context) => {
       `${formatNumber(refund.quantity)} barang`,
       `<span class="table-note">${escapeHtml(refund.reason)}</span>`,
       badge(REFUND_STATUS_LABELS[refund.status], REFUND_STATUS_TONES[refund.status]),
+      refund.accountName
+        ? escapeHtml(refund.accountName)
+        : '<span class="muted">—</span>',
       `<div class="table-actions">
         <a class="btn btn-ghost btn-sm" href="#/finance/refunds/${refund.id}/edit">Ubah</a>
         <button type="button" class="btn btn-ghost btn-icon" data-delete-refund="${escapeAttr(refund.id)}" aria-label="Hapus refund" title="Hapus refund">${icon('trash')}</button>
@@ -207,7 +211,7 @@ export const refundListPage: PageRenderer = async (context) => {
           ? card({
               padded: false,
               body: dataTable(
-                ['Tanggal', 'Pesanan / toko', 'Nilai', 'Jumlah', 'Alasan', 'Status', ''],
+                ['Tanggal', 'Pesanan / toko', 'Nilai', 'Jumlah', 'Alasan', 'Status', 'Rekening', ''],
                 rows,
               ),
             })
@@ -278,9 +282,10 @@ export const refundFormPage: PageRenderer = async (context) => {
   root.innerHTML = loadingBlock(isEdit ? 'Memuat refund…' : 'Menyiapkan formulir…');
 
   try {
-    const [stores, refund] = await Promise.all([
+    const [stores, refund, cashAccounts] = await Promise.all([
       services.storeService.listAll(),
       id ? services.refundService.get(id) : Promise.resolve<RefundListItem | null>(null),
+      services.cashService.listForSelect(),
     ]);
     if (context.signal.aborted) return;
     context.setTitle(isEdit ? 'Ubah refund' : 'Refund baru');
@@ -332,6 +337,7 @@ export const refundFormPage: PageRenderer = async (context) => {
         totalPayout: 0,
         status: 'pending',
         notes: null,
+        accountId: null,
         createdAt: '',
         updatedAt: '',
       });
@@ -390,6 +396,15 @@ export const refundFormPage: PageRenderer = async (context) => {
                 })),
               ],
               help: 'Opsional. Settlement harus berasal dari toko yang sama.',
+              idPrefix: 'refund',
+            })}
+            ${formField({
+              name: 'accountId',
+              label: 'Rekening pengeluaran',
+              type: 'select',
+              value: refund?.accountId ?? '',
+              options: cashAccountChoices(cashAccounts, refund?.accountId ?? null),
+              help: 'Opsional, untuk refund selesai yang tidak termasuk pencairan settlement. Saldo rekening akan berkurang.',
               idPrefix: 'refund',
             })}
             ${formField({
@@ -537,6 +552,7 @@ export const refundFormPage: PageRenderer = async (context) => {
           reason: readText(form, 'reason'),
           status: readText(form, 'status') as RefundStatus,
           notes: readOptionalText(form, 'notes'),
+          accountId: readText(form, 'accountId') || null,
         };
         if (isEdit && id) {
           await services.refundService.update(id, input);

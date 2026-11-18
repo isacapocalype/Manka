@@ -6,8 +6,10 @@ import type {
   StorePerformance,
 } from '@/types/finance';
 import type { FinancialService } from './financialService';
+import type { CashService } from './cashService';
 import type { StoreRepository } from '@/core/repositories/storeRepository';
 import type { OrderRepository } from '@/core/repositories/orderRepository';
+import type { CashSummary } from '@/types/cash';
 import type { DateRange, OrderListItem } from '@/types/entities';
 import { previousRange } from '@/core/utils/date';
 import {
@@ -28,29 +30,44 @@ export interface DashboardData {
   stores: Store[];
   recentOrders: OrderListItem[];
   receivedSettlements: number;
+  cash: CashSummary;
 }
 
 export class DashboardService {
   private readonly finance: FinancialService;
   private readonly stores: StoreRepository;
   private readonly orders: OrderRepository;
+  private readonly cash: CashService;
 
-  constructor(finance: FinancialService, stores: StoreRepository, orders: OrderRepository) {
+  constructor(
+    finance: FinancialService,
+    stores: StoreRepository,
+    orders: OrderRepository,
+    cash: CashService,
+  ) {
     this.finance = finance;
     this.stores = stores;
     this.orders = orders;
+    this.cash = cash;
   }
 
   async load(range: DateRange, storeId: string | null): Promise<DashboardData> {
     const previous = previousRange(range);
-    const [currentDataset, previousDataset, stores, recentOrders, receivedSettlements] =
-      await Promise.all([
-        this.finance.loadDataset(range),
-        this.finance.loadDataset(previous),
-        this.stores.listAll(),
-        this.orders.listRecent(6, storeId),
-        this.finance.getReceivedSettlements(range, storeId),
-      ]);
+    const [
+      currentDataset,
+      previousDataset,
+      stores,
+      recentOrders,
+      receivedSettlements,
+      cash,
+    ] = await Promise.all([
+      this.finance.loadDataset(range),
+      this.finance.loadDataset(previous),
+      this.stores.listAll(),
+      this.orders.listRecent(6, storeId),
+      this.finance.getReceivedSettlements(range, storeId),
+      this.cash.getSummary(),
+    ]);
 
     const summary = calculateFinancialSummary(currentDataset, { storeId });
     const previousSummary = calculateFinancialSummary(previousDataset, { storeId });
@@ -71,6 +88,7 @@ export class DashboardService {
       stores,
       recentOrders,
       receivedSettlements,
+      cash,
     };
   }
 }

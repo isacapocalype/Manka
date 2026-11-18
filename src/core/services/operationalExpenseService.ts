@@ -4,6 +4,7 @@ import type {
   OperationalExpenseListItem,
   PagedResult,
 } from '@/types/entities';
+import type { Database } from '@/core/database/types';
 import { EXPENSE_CATEGORIES } from '@/types/entities';
 import type {
   OperationalExpenseFilters,
@@ -12,6 +13,7 @@ import type {
 } from '@/core/repositories/operationalExpenseRepository';
 import type { StoreRepository } from '@/core/repositories/storeRepository';
 import type { AuditRepository } from '@/core/repositories/auditRepository';
+import type { CashService } from './cashService';
 import {
   NotFoundError,
   ValidationError,
@@ -35,18 +37,24 @@ function validateCategory(value: string): ExpenseCategory {
 }
 
 export class OperationalExpenseService {
+  private readonly db: Database;
   private readonly expenses: OperationalExpenseRepository;
   private readonly stores: StoreRepository;
   private readonly audit: AuditRepository;
+  private readonly cash: CashService;
 
   constructor(
+    db: Database,
     expenses: OperationalExpenseRepository,
     stores: StoreRepository,
     audit: AuditRepository,
+    cash: CashService,
   ) {
+    this.db = db;
     this.expenses = expenses;
     this.stores = stores;
     this.audit = audit;
+    this.cash = cash;
   }
 
   list(filters: OperationalExpenseFilters): Promise<PagedResult<OperationalExpenseListItem>> {
@@ -78,6 +86,16 @@ export class OperationalExpenseService {
         amount: 'Nominal biaya harus lebih dari 0.',
       });
     }
+    const accountId = optionalText(input.accountId, 100);
+    if (accountId) {
+      await this.cash.requireAccount(accountId, 'accountId');
+    }
+    const isPaid = input.isPaid ?? false;
+    if (isPaid && !accountId) {
+      throw new ValidationError('Rekening kas wajib dipilih untuk biaya yang sudah dibayar.', {
+        accountId: 'Pilih rekening sumber dana.',
+      });
+    }
     return {
       storeId,
       expenseDate: input.expenseDate,
@@ -85,17 +103,25 @@ export class OperationalExpenseService {
       amount,
       description: requiredText(input.description, 'Deskripsi', 'description'),
       receiptNote: optionalText(input.receiptNote, 2000),
+      accountId,
+      isPaid,
     };
   }
 
   async create(input: OperationalExpenseFormInput): Promise<OperationalExpenseListItem> {
     const data = await this.normalize(input);
-    const id = await this.expenses.create(data);
+    const id = await this.db.transaction(async (tx) => {
+      const expenseId = await this.expenses.create(data, tx);
+      await this.cash.syncOperationalExpense(expenseId, data, tx);
+      return expenseId;
+    });
     await this.audit.log('create', 'operational_expense', id, {
       storeId: data.storeId,
       category: data.category,
       amount: data.amount,
       date: data.expenseDate,
+      isPaid: data.isPaid,
+      accountId: data.accountId,
     });
     return this.get(id);
   }
@@ -106,19 +132,27 @@ export class OperationalExpenseService {
   ): Promise<OperationalExpenseListItem> {
     await this.get(id);
     const data = await this.normalize(input);
-    await this.expenses.update(id, data);
+    await this.db.transaction(async (tx) => {
+      await this.expenses.update(id, data, tx);
+      await this.cash.syncOperationalExpense(id, data, tx);
+    });
     await this.audit.log('update', 'operational_expense', id, {
       storeId: data.storeId,
       category: data.category,
       amount: data.amount,
       date: data.expenseDate,
+      isPaid: data.isPaid,
+      accountId: data.accountId,
     });
     return this.get(id);
   }
 
   async delete(id: string): Promise<void> {
     await this.get(id);
-    await this.expenses.delete(id);
+    await this.db.transaction(async (tx) => {
+      await this.cash.removeSourceEntries('operational_expense', id, tx);
+      await this.expenses.delete(id, tx);
+    });
     await this.audit.log('delete', 'operational_expense', id);
   }
 }

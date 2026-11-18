@@ -28,6 +28,14 @@ import {
 import { expenseListPage, expenseFormPage } from '@/modules/finance/expensePages';
 import { refundListPage, refundFormPage } from '@/modules/finance/refundPages';
 import { settlementListPage, settlementFormPage } from '@/modules/finance/settlementPages';
+import {
+  cashAccountFormPage,
+  cashAdjustmentFormPage,
+  cashLedgerPage,
+  cashOverviewPage,
+  cashReconciliationFormPage,
+  cashTransferFormPage,
+} from '@/modules/finance/cashPages';
 import { reportsPage } from '@/modules/reports/reportsPage';
 import { healthPage } from '@/modules/health/healthPage';
 import { settingsPage } from '@/modules/settings/settingsPage';
@@ -62,6 +70,22 @@ export const APP_ROUTES: RouteDefinition[] = [
   { path: '/production/:id', title: 'Detail work order', render: productionDetailPage },
 
   { path: '/finance', title: 'Keuangan', render: financeOverviewPage },
+
+  { path: '/finance/cash', title: 'Kas & rekening', render: cashOverviewPage },
+  { path: '/finance/cash/new', title: 'Rekening kas baru', render: cashAccountFormPage },
+  { path: '/finance/cash/ledger', title: 'Buku besar kas', render: cashLedgerPage },
+  { path: '/finance/cash/transfers/new', title: 'Transfer kas', render: cashTransferFormPage },
+  {
+    path: '/finance/cash/reconciliations/new',
+    title: 'Rekonsiliasi kas',
+    render: cashReconciliationFormPage,
+  },
+  {
+    path: '/finance/cash/adjustments/new',
+    title: 'Penyesuaian kas',
+    render: cashAdjustmentFormPage,
+  },
+  { path: '/finance/cash/:id/edit', title: 'Ubah rekening kas', render: cashAccountFormPage },
 
   { path: '/finance/fees', title: 'Biaya marketplace', render: feeListPage },
   { path: '/finance/fees/new', title: 'Biaya marketplace baru', render: feeFormPage },

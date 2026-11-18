@@ -65,12 +65,14 @@ export const financeOverviewPage: PageRenderer = async (context) => {
     const filteredStores = filters.storeId
       ? stores.filter((store) => store.id === filters.storeId)
       : stores;
-    const [summary, daily, storePerformance, receivedSettlements] = await Promise.all([
-      services.financeService.getSummary(filters.period, filters.storeId),
-      services.financeService.getDaily(filters.period, filters.storeId),
-      services.financeService.getStorePerformance(filters.period, filteredStores),
-      services.financeService.getReceivedSettlements(filters.period, filters.storeId),
-    ]);
+    const [summary, daily, storePerformance, receivedSettlements, cashSummary] =
+      await Promise.all([
+        services.financeService.getSummary(filters.period, filters.storeId),
+        services.financeService.getDaily(filters.period, filters.storeId),
+        services.financeService.getStorePerformance(filters.period, filteredStores),
+        services.financeService.getReceivedSettlements(filters.period, filters.storeId),
+        services.cashService.getSummary(),
+      ]);
     if (context.signal.aborted) return;
 
     context.setTitle('Keuangan');
@@ -86,6 +88,14 @@ export const financeOverviewPage: PageRenderer = async (context) => {
       receivedSettlements !== 0;
 
     const shortcuts: FinanceShortcut[] = [
+      {
+        href: '/finance/cash',
+        title: 'Kas & rekening',
+        description: 'Saldo kas, bank, e-wallet, transfer, dan rekonsiliasi.',
+        iconName: 'landmark',
+        count: cashSummary.accountCount,
+        countLabel: 'rekening',
+      },
       {
         href: '/finance/fees',
         title: 'Biaya marketplace',
@@ -169,6 +179,20 @@ export const financeOverviewPage: PageRenderer = async (context) => {
           hint: 'Arus kas, tidak menambah omzet',
         })}
       </div>
+
+      ${card({
+        title: 'Kas & pencairan',
+        subtitle: 'Saldo rekening dan dana yang belum masuk',
+        actions: linkButton('/finance/cash', 'Buka kas', 'btn btn-ghost btn-sm', 'arrow-right'),
+        body: `
+          <div class="kpi-grid kpi-grid-3">
+            <div class="import-stat"><strong>${formatRupiah(cashSummary.totalBalance)}</strong><span>Saldo kas semua rekening</span></div>
+            <div class="import-stat import-stat-warning"><strong>${formatRupiah(cashSummary.pendingSettlements.amount)}</strong><span>${formatNumber(cashSummary.pendingSettlements.count)} settlement menunggu</span></div>
+            <div class="import-stat import-stat-warning"><strong>${formatRupiah(cashSummary.unassignedSettlements.amount + cashSummary.unlinkedRefunds.amount)}</strong><span>Dana belum tercatat di rekening</span></div>
+          </div>
+          <p class="inline-note">${icon('info')} Settlement pending, settlement diterima tanpa rekening, dan refund selesai tanpa settlement perlu ditindaklanjuti di halaman kas.</p>
+        `,
+      })}
 
       ${
         summary.hasEstimatedFees

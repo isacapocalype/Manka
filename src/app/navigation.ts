@@ -89,6 +89,13 @@ export const FINANCE_NAV: NavItem[] = [
     section: 'finance',
   },
   {
+    href: '/finance/cash',
+    label: 'Kas & rekening',
+    iconName: 'landmark',
+    match: ['/finance/cash'],
+    section: 'finance',
+  },
+  {
     href: '/finance/fees',
     label: 'Biaya marketplace',
     iconName: 'credit-card',

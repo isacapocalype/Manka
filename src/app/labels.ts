@@ -16,6 +16,11 @@ import type {
   WorkOrderStatus,
 } from '@/types/production';
 import type { BomItemType } from '@/types/bom';
+import type {
+  CashAccountStatus,
+  CashAccountType,
+  CashEntrySourceType,
+} from '@/types/cash';
 
 export type BadgeTone = 'neutral' | 'primary' | 'success' | 'warning' | 'danger' | 'info';
 
@@ -183,6 +188,40 @@ export const SETTLEMENT_STATUS_LABELS: Record<SettlementStatus, string> = {
 export const SETTLEMENT_STATUS_TONES: Record<SettlementStatus, BadgeTone> = {
   pending: 'warning',
   received: 'success',
+};
+
+export const CASH_ACCOUNT_TYPE_LABELS: Record<CashAccountType, string> = {
+  cash: 'Kas tunai',
+  bank: 'Bank',
+  ewallet: 'E-wallet',
+};
+
+export const CASH_ACCOUNT_STATUS_LABELS: Record<CashAccountStatus, string> = {
+  active: 'Aktif',
+  archived: 'Diarsipkan',
+};
+
+export const CASH_ACCOUNT_STATUS_TONES: Record<CashAccountStatus, BadgeTone> = {
+  active: 'success',
+  archived: 'neutral',
+};
+
+export const CASH_SOURCE_TYPE_LABELS: Record<CashEntrySourceType, string> = {
+  settlement: 'Settlement',
+  operational_expense: 'Biaya operasional',
+  advertising_expense: 'Biaya iklan',
+  refund: 'Refund',
+  transfer: 'Transfer',
+  adjustment: 'Penyesuaian',
+};
+
+export const CASH_SOURCE_TYPE_TONES: Record<CashEntrySourceType, BadgeTone> = {
+  settlement: 'success',
+  operational_expense: 'warning',
+  advertising_expense: 'warning',
+  refund: 'danger',
+  transfer: 'info',
+  adjustment: 'neutral',
 };
 
 export const IMPORT_TYPE_LABELS: Record<string, string> = {

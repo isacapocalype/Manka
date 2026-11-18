@@ -92,6 +92,7 @@ function mapRefund(row: SqlRow): Refund {
     reason: getString(row, 'reason'),
     status: getString(row, 'status') as RefundStatus,
     notes: getNullableString(row, 'notes'),
+    accountId: getNullableString(row, 'account_id'),
     createdAt: getString(row, 'created_at'),
     updatedAt: getString(row, 'updated_at'),
   };

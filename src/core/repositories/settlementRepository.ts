@@ -29,6 +29,7 @@ export interface SettlementWriteData {
   totalPayout: number;
   status: SettlementStatus;
   notes: string | null;
+  accountId: string | null;
 }
 
 function mapSettlement(row: SqlRow): SettlementListItem {
@@ -42,16 +43,19 @@ function mapSettlement(row: SqlRow): SettlementListItem {
     totalPayout: getNumber(row, 'total_payout'),
     status: getString(row, 'status') as SettlementStatus,
     notes: getNullableString(row, 'notes'),
+    accountId: getNullableString(row, 'account_id'),
     createdAt: getString(row, 'created_at'),
     updatedAt: getString(row, 'updated_at'),
     storeName: getString(row, 'store_name'),
+    accountName: getNullableString(row, 'account_name'),
   };
 }
 
 const SETTLEMENT_SELECT = `
-  SELECT st.*, s.name AS store_name
+  SELECT st.*, s.name AS store_name, ca.name AS account_name
   FROM settlements st
   JOIN stores s ON s.id = st.store_id
+  LEFT JOIN cash_accounts ca ON ca.id = st.account_id
 `;
 
 export class SettlementRepository {
@@ -122,6 +126,7 @@ export class SettlementRepository {
       totalPayout: getNumber(row, 'total_payout'),
       status: getString(row, 'status') as SettlementStatus,
       notes: getNullableString(row, 'notes'),
+      accountId: getNullableString(row, 'account_id'),
       createdAt: getString(row, 'created_at'),
       updatedAt: getString(row, 'updated_at'),
     };
@@ -172,6 +177,7 @@ export class SettlementRepository {
         totalPayout: item.totalPayout,
         status: item.status,
         notes: item.notes,
+        accountId: item.accountId,
         createdAt: item.createdAt,
         updatedAt: item.updatedAt,
       };
@@ -182,8 +188,8 @@ export class SettlementRepository {
     const id = createId();
     const timestamp = nowIso();
     await (tx ?? this.db).execute(
-      `INSERT INTO settlements (id, store_id, settlement_no, settlement_date, gross_sales, total_deductions, total_payout, status, notes, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+      `INSERT INTO settlements (id, store_id, settlement_no, settlement_date, gross_sales, total_deductions, total_payout, status, notes, account_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         id,
         data.storeId,
@@ -194,6 +200,7 @@ export class SettlementRepository {
         data.totalPayout,
         data.status,
         data.notes,
+        data.accountId,
         timestamp,
         timestamp,
       ],
@@ -201,10 +208,10 @@ export class SettlementRepository {
     return id;
   }
 
-  async update(id: string, data: SettlementWriteData): Promise<void> {
-    await this.db.execute(
+  async update(id: string, data: SettlementWriteData, tx?: SqlExecutor): Promise<void> {
+    await (tx ?? this.db).execute(
       `UPDATE settlements SET store_id = ?, settlement_no = ?, settlement_date = ?, gross_sales = ?, total_deductions = ?,
-        total_payout = ?, status = ?, notes = ?, updated_at = ?
+        total_payout = ?, status = ?, notes = ?, account_id = ?, updated_at = ?
        WHERE id = ?;`,
       [
         data.storeId,
@@ -215,14 +222,15 @@ export class SettlementRepository {
         data.totalPayout,
         data.status,
         data.notes,
+        data.accountId,
         nowIso(),
         id,
       ],
     );
   }
 
-  async delete(id: string): Promise<void> {
-    await this.db.execute('DELETE FROM settlements WHERE id = ?;', [id]);
+  async delete(id: string, tx?: SqlExecutor): Promise<void> {
+    await (tx ?? this.db).execute('DELETE FROM settlements WHERE id = ?;', [id]);
   }
 
   async sumReceived(from: string, to: string, storeId?: string | null): Promise<number> {
