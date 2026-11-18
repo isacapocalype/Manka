@@ -18,6 +18,7 @@ import { nowIso } from '@/core/utils/date';
 import { calculateOrderMath, isRevenueOrderStatus } from '@/core/calculations/orderMath';
 import { getNullableNumber, getNullableString, getNumber, getString } from './rowUtils';
 import type { FinanceOrder } from '@/types/finance';
+import type { CompletedOrderWithoutFee } from '@/types/health';
 
 function toStatus(value: string): OrderStatus {
   const statuses: OrderStatus[] = [
@@ -391,6 +392,25 @@ export class OrderRepository {
       storeId,
     ]);
     return Number(rows[0]?.total ?? 0);
+  }
+
+  async findCompletedWithoutFees(): Promise<CompletedOrderWithoutFee[]> {
+    const rows = await this.db.query(
+      `SELECT o.id, o.marketplace_order_id, o.order_date, s.name AS store_name
+       FROM orders o
+       JOIN stores s ON s.id = o.store_id
+       WHERE o.status = 'completed'
+         AND NOT EXISTS (
+           SELECT 1 FROM marketplace_fees f WHERE f.order_id = o.id
+         )
+       ORDER BY o.order_date ASC, o.created_at ASC;`,
+    );
+    return rows.map((row) => ({
+      id: getString(row, 'id'),
+      marketplaceOrderId: getString(row, 'marketplace_order_id'),
+      orderDate: getString(row, 'order_date'),
+      storeName: getString(row, 'store_name'),
+    }));
   }
 
   async findForFinance(from: string, to: string): Promise<FinanceOrder[]> {

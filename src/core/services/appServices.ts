@@ -27,6 +27,7 @@ import { FinancialService } from './financialService';
 import { DashboardService } from './dashboardService';
 import { ReportService } from './reportService';
 import { ProductProfitService } from './productProfitService';
+import { DataHealthService } from './dataHealthService';
 
 export interface AppServices {
   db: Database;
@@ -57,6 +58,7 @@ export interface AppServices {
   dashboardService: DashboardService;
   reportService: ReportService;
   productProfitService: ProductProfitService;
+  dataHealthService: DataHealthService;
 }
 
 export function createAppServices(
@@ -107,6 +109,7 @@ export function createAppServices(
   const dashboardService = new DashboardService(financeService, stores, orders);
   const productProfitService = new ProductProfitService(orders, fees, refunds);
   const reportService = new ReportService(financeService, stores, productProfitService);
+  const dataHealthService = new DataHealthService(orders, products, settlements, settings);
 
   return {
     db,
@@ -137,6 +140,7 @@ export function createAppServices(
     dashboardService,
     reportService,
     productProfitService,
+    dataHealthService,
   };
 }
 

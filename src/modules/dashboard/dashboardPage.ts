@@ -30,7 +30,11 @@ export const dashboardPage: PageRenderer = async (context) => {
   let data: DashboardData;
   try {
     const filters = readListFilters(context.query);
-    data = await services.dashboardService.load(filters.period, filters.storeId);
+    const [dashboardData, health] = await Promise.all([
+      services.dashboardService.load(filters.period, filters.storeId),
+      services.dataHealthService.check(),
+    ]);
+    data = dashboardData;
     if (context.signal.aborted) return;
 
     context.setTitle('Dashboard');
@@ -113,6 +117,26 @@ export const dashboardPage: PageRenderer = async (context) => {
         </div>
       `
       : '';
+
+    const healthIssues = health.checks.filter((item) => item.count > 0);
+    const healthCard = card({
+      title: 'Kesehatan data',
+      subtitle:
+        health.totalIssues === 0
+          ? 'Semua pemeriksaan aman'
+          : `${formatNumber(health.totalIssues)} temuan · ${formatNumber(health.criticalChecks)} kritis`,
+      actions: linkButton('/health', 'Periksa semua', 'btn btn-ghost btn-sm', 'arrow-right'),
+      body:
+        healthIssues.length === 0
+          ? `<p class="inline-note note-success">${icon('shield-check')} Data utama sudah lengkap. Tetap buat backup berkala.</p>`
+          : `<ul class="cost-list">
+              ${healthIssues
+                .map(
+                  (item) => `<li><span>${icon(item.severity === 'critical' ? 'shield-alert' : 'circle-alert')} ${escapeHtml(item.title)}</span><strong>${formatNumber(item.count)}</strong></li>`,
+                )
+                .join('')}
+            </ul>`,
+    });
 
     const activityContent = !hasActivity
       ? card({
@@ -214,6 +238,7 @@ export const dashboardPage: PageRenderer = async (context) => {
       ${filterBar}
       ${onboarding}
       ${kpiGrid}
+      ${hasStores ? healthCard : ''}
       ${hasStores && hasActivity && summary.hasEstimatedFees ? `<p class="inline-note note-warning">${icon('triangle-alert')} Sebagian biaya marketplace adalah estimasi. Laba operasional dapat berubah saat biaya aktual dicatat.</p>` : ''}
       ${activeStoreName && (summary.sharedAdvertisingSpend > 0 || summary.sharedOperationalExpenses > 0) ? `<p class="inline-note">${icon('info')} Biaya bersama tidak dialokasikan ke toko yang dipilih.</p>` : ''}
       <div class="dashboard-stack">${activityContent}</div>

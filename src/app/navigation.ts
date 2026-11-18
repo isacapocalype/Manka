@@ -51,6 +51,13 @@ export const MAIN_NAV: NavItem[] = [
     section: 'main',
   },
   {
+    href: '/health',
+    label: 'Kesehatan',
+    iconName: 'shield-check',
+    match: ['/health'],
+    section: 'main',
+  },
+  {
     href: '/settings',
     label: 'Pengaturan',
     iconName: 'settings',
@@ -133,7 +140,7 @@ export const MOBILE_NAV: NavItem[] = [
     href: '/more',
     label: 'Lainnya',
     iconName: 'menu',
-    match: ['/more', '/stores', '/reports', '/settings'],
+    match: ['/more', '/stores', '/reports', '/health', '/settings'],
   },
 ];
 
@@ -147,6 +154,7 @@ export function activeMainHref(path: string): string {
   if (path.startsWith('/orders')) return '/orders';
   if (path.startsWith('/products')) return '/products';
   if (path.startsWith('/reports')) return '/reports';
+  if (path.startsWith('/health')) return '/more';
   if (path.startsWith('/settings')) return '/settings';
   if (path.startsWith('/more')) return '/more';
   return '/dashboard';

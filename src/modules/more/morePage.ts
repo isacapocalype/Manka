@@ -44,6 +44,13 @@ const MAIN_LINKS: MoreLink[] = [
     iconName: 'chart-column',
   },
   {
+    href: '/health',
+    label: 'Kesehatan data',
+    description:
+      'Periksa pesanan tanpa fee, produk HPP 0, settlement pending, dan backup yang terlambat.',
+    iconName: 'shield-check',
+  },
+  {
     href: '/settings',
     label: 'Pengaturan & backup',
     description: 'Backup terenkripsi, restore, riwayat import, audit log, dan keamanan data.',

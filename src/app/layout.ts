@@ -49,7 +49,7 @@ export function createLayout(
     ['/dashboard', '/stores', '/orders', '/products'].includes(item.href),
   );
   const sidebarBottom = MAIN_NAV.filter((item) =>
-    ['/reports', '/settings'].includes(item.href),
+    ['/reports', '/health', '/settings'].includes(item.href),
   );
   const todayLabel = formatBusinessDate(todayJakarta(), 'weekday');
   const backendLabel = services.db.backend === 'native' ? 'SQLite lokal' : 'SQLite dev';

@@ -8,6 +8,7 @@ import type {
 import { createId } from '@/core/utils/id';
 import { nowIso } from '@/core/utils/date';
 import { getNullableString, getNumber, getString } from './rowUtils';
+import type { PendingSettlementSummary } from '@/types/health';
 
 export interface SettlementFilters {
   storeId?: string | null;
@@ -124,6 +125,25 @@ export class SettlementRepository {
       createdAt: getString(row, 'created_at'),
       updatedAt: getString(row, 'updated_at'),
     };
+  }
+
+  async findPendingBefore(date: string): Promise<PendingSettlementSummary[]> {
+    const rows = await this.db.query(
+      `SELECT st.id, st.settlement_no, st.settlement_date, st.total_payout,
+         s.name AS store_name
+       FROM settlements st
+       JOIN stores s ON s.id = st.store_id
+       WHERE st.status = 'pending' AND st.settlement_date < ?
+       ORDER BY st.settlement_date ASC, st.created_at ASC;`,
+      [date],
+    );
+    return rows.map((row) => ({
+      id: getString(row, 'id'),
+      settlementNo: getString(row, 'settlement_no'),
+      settlementDate: getString(row, 'settlement_date'),
+      totalPayout: getNumber(row, 'total_payout'),
+      storeName: getString(row, 'store_name'),
+    }));
   }
 
   async listForSelect(storeId?: string | null): Promise<Settlement[]> {

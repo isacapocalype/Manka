@@ -23,6 +23,7 @@ import { expenseListPage, expenseFormPage } from '@/modules/finance/expensePages
 import { refundListPage, refundFormPage } from '@/modules/finance/refundPages';
 import { settlementListPage, settlementFormPage } from '@/modules/finance/settlementPages';
 import { reportsPage } from '@/modules/reports/reportsPage';
+import { healthPage } from '@/modules/health/healthPage';
 import { settingsPage } from '@/modules/settings/settingsPage';
 import { morePage } from '@/modules/more/morePage';
 
@@ -84,6 +85,7 @@ export const APP_ROUTES: RouteDefinition[] = [
   },
 
   { path: '/reports', title: 'Laporan', render: reportsPage },
+  { path: '/health', title: 'Kesehatan data', render: healthPage },
   { path: '/settings', title: 'Pengaturan', render: settingsPage },
   { path: '/more', title: 'Lainnya', render: morePage },
 ];
