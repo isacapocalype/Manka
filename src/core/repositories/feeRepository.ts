@@ -181,6 +181,24 @@ export class FeeRepository {
     }));
   }
 
+  /** Biaya yang terhubung ke pesanan pada rentang tanggal pesanan. */
+  async findByOrderDateRange(from: string, to: string): Promise<FinanceFee[]> {
+    const rows = await this.db.query(
+      `SELECT f.store_id, f.order_id, f.fee_date, f.amount, f.source
+       FROM marketplace_fees f
+       JOIN orders o ON o.id = f.order_id
+       WHERE o.order_date >= ? AND o.order_date <= ?;`,
+      [from, to],
+    );
+    return rows.map((row) => ({
+      storeId: getString(row, 'store_id'),
+      orderId: getNullableString(row, 'order_id'),
+      feeDate: getString(row, 'fee_date'),
+      amount: getNumber(row, 'amount'),
+      source: getString(row, 'source') as FeeSource,
+    }));
+  }
+
   async sumByOrder(orderId: string): Promise<number> {
     const rows = await this.db.query(
       'SELECT COALESCE(SUM(amount), 0) AS total FROM marketplace_fees WHERE order_id = ?;',

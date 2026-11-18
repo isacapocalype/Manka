@@ -19,8 +19,24 @@ const dataset: FinancialDataset = {
       sellerDiscount: 10_000,
       marketplaceDiscount: 5_000,
       items: [
-        { quantity: 2, unitPrice: 100_000, hppSnapshot: 60_000 },
-        { quantity: 1, unitPrice: 25_000, hppSnapshot: 10_000 },
+        {
+          productId: 'product-a',
+          productName: 'Kaos',
+          sku: 'KAOS-01',
+          category: 'Atasan',
+          quantity: 2,
+          unitPrice: 100_000,
+          hppSnapshot: 60_000,
+        },
+        {
+          productId: 'product-b',
+          productName: 'Topi',
+          sku: 'TOPI-01',
+          category: 'Aksesori',
+          quantity: 1,
+          unitPrice: 25_000,
+          hppSnapshot: 10_000,
+        },
       ],
     },
     {
@@ -30,7 +46,17 @@ const dataset: FinancialDataset = {
       status: 'shipped',
       sellerDiscount: 0,
       marketplaceDiscount: 0,
-      items: [{ quantity: 1, unitPrice: 50_000, hppSnapshot: 30_000 }],
+      items: [
+        {
+          productId: 'product-c',
+          productName: 'Jaket',
+          sku: 'JAKET-01',
+          category: 'Outerwear',
+          quantity: 1,
+          unitPrice: 50_000,
+          hppSnapshot: 30_000,
+        },
+      ],
     },
     {
       id: 'order-cancelled',
@@ -39,7 +65,17 @@ const dataset: FinancialDataset = {
       status: 'cancelled',
       sellerDiscount: 50_000,
       marketplaceDiscount: 0,
-      items: [{ quantity: 10, unitPrice: 100_000, hppSnapshot: 60_000 }],
+      items: [
+        {
+          productId: 'product-a',
+          productName: 'Kaos',
+          sku: 'KAOS-01',
+          category: 'Atasan',
+          quantity: 10,
+          unitPrice: 100_000,
+          hppSnapshot: 60_000,
+        },
+      ],
     },
   ],
   fees: [

@@ -196,4 +196,23 @@ export class RefundRepository {
       orderStatus: toOrderStatus(getString(row, 'order_status')),
     }));
   }
+
+  /** Refund yang terhubung ke pesanan pada rentang tanggal pesanan. */
+  async findByOrderDateRange(from: string, to: string): Promise<FinanceRefund[]> {
+    const rows = await this.db.query(
+      `SELECT r.store_id, r.order_id, r.refund_date, r.amount, r.status, o.status AS order_status
+       FROM refunds r
+       JOIN orders o ON o.id = r.order_id
+       WHERE o.order_date >= ? AND o.order_date <= ?;`,
+      [from, to],
+    );
+    return rows.map((row) => ({
+      storeId: getString(row, 'store_id'),
+      orderId: getString(row, 'order_id'),
+      refundDate: getString(row, 'refund_date'),
+      amount: getNumber(row, 'amount'),
+      status: getString(row, 'status') as RefundStatus,
+      orderStatus: toOrderStatus(getString(row, 'order_status')),
+    }));
+  }
 }

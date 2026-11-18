@@ -4,6 +4,9 @@ import type {
   FinancialDataset,
   FinancialFilter,
   FinancialSummary,
+  ProductProfitDataset,
+  ProductProfitReport,
+  ProductProfitRow,
   StorePerformance,
 } from '@/types/finance';
 import type { BusinessDate, Store } from '@/types/entities';
@@ -268,6 +271,204 @@ export function buildComparison(
       current.operatingProfit,
       previous.operatingProfit,
     ),
+  };
+}
+
+interface ProductProfitAccumulator {
+  key: string;
+  productId: string | null;
+  productName: string;
+  sku: string;
+  category: string | null;
+  unitsSold: number;
+  orderIds: Set<string>;
+  grossSales: number;
+  sellerDiscount: number;
+  refunds: number;
+  cogs: number;
+  marketplaceFeesActual: number;
+  marketplaceFeesEstimated: number;
+  hasMissingHpp: boolean;
+}
+
+function allocateProportionally(total: number, weights: readonly number[]): number[] {
+  if (weights.length === 0 || total === 0) {
+    return weights.map(() => 0);
+  }
+  const weightSum = weights.reduce((sum, weight) => sum + weight, 0);
+  const effectiveWeights = weightSum > 0 ? weights : weights.map(() => 1);
+  const effectiveSum = weightSum > 0 ? weightSum : weights.length;
+  let allocated = 0;
+  return effectiveWeights.map((weight, index) => {
+    if (index === effectiveWeights.length - 1) {
+      return total - allocated;
+    }
+    const share = Math.round((total * weight) / effectiveSum);
+    allocated += share;
+    return share;
+  });
+}
+
+function productKey(item: { productId: string | null; sku: string; productName: string }): string {
+  if (item.productId) return `product:${item.productId}`;
+  return `sku:${item.sku || item.productName}`;
+}
+
+/**
+ * Laba per produk memakai item pesanan pada periode tanggal pesanan.
+ * Diskon penjual, refund, dan fee marketplace level pesanan dialokasikan
+ * proporsional terhadap omzet item. Fee tanpa pesanan tidak dialokasikan.
+ */
+export function calculateProductProfit(
+  dataset: ProductProfitDataset,
+  filter: FinancialFilter,
+): ProductProfitReport {
+  const products = new Map<string, ProductProfitAccumulator>();
+  const orderIds = new Set<string>();
+
+  for (const order of dataset.orders) {
+    if (!isRevenueOrderStatus(order.status)) continue;
+    if (!storeMatches(order.storeId, filter)) continue;
+    const items = order.items.filter((item) => item.quantity > 0);
+    if (items.length === 0) continue;
+
+    orderIds.add(order.id);
+    const weights = items.map((item) => item.quantity * item.unitPrice);
+    const discountShares = allocateProportionally(order.sellerDiscount, weights);
+
+    const refundTotal = dataset.refunds
+      .filter(
+        (refund) =>
+          refund.orderId === order.id &&
+          refund.status === 'completed' &&
+          isRevenueOrderStatus(refund.orderStatus) &&
+          storeMatches(refund.storeId, filter),
+      )
+      .reduce((total, refund) => total + refund.amount, 0);
+    const refundShares = allocateProportionally(refundTotal, weights);
+
+    const orderFees = dataset.fees.filter(
+      (fee) => fee.orderId === order.id && storeMatches(fee.storeId, filter),
+    );
+    const feeActual = orderFees
+      .filter((fee) => fee.source === 'actual')
+      .reduce((total, fee) => total + fee.amount, 0);
+    const feeEstimated = orderFees
+      .filter((fee) => fee.source === 'estimated')
+      .reduce((total, fee) => total + fee.amount, 0);
+    const feeActualShares = allocateProportionally(feeActual, weights);
+    const feeEstimatedShares = allocateProportionally(feeEstimated, weights);
+
+    items.forEach((item, index) => {
+      const key = productKey(item);
+      let product = products.get(key);
+      if (!product) {
+        product = {
+          key,
+          productId: item.productId,
+          productName: item.productName || item.sku || 'Tanpa nama',
+          sku: item.sku,
+          category: item.category,
+          unitsSold: 0,
+          orderIds: new Set<string>(),
+          grossSales: 0,
+          sellerDiscount: 0,
+          refunds: 0,
+          cogs: 0,
+          marketplaceFeesActual: 0,
+          marketplaceFeesEstimated: 0,
+          hasMissingHpp: false,
+        };
+        products.set(key, product);
+      }
+      product.productName = item.productName || product.productName;
+      product.sku = item.sku || product.sku;
+      product.category = item.category ?? product.category;
+      product.unitsSold += item.quantity;
+      product.orderIds.add(order.id);
+      product.grossSales += item.quantity * item.unitPrice;
+      product.sellerDiscount += discountShares[index] ?? 0;
+      product.refunds += refundShares[index] ?? 0;
+      product.cogs += item.quantity * item.hppSnapshot;
+      product.marketplaceFeesActual += feeActualShares[index] ?? 0;
+      product.marketplaceFeesEstimated += feeEstimatedShares[index] ?? 0;
+      if (item.hppSnapshot === 0) product.hasMissingHpp = true;
+    });
+  }
+
+  const rows: ProductProfitRow[] = [...products.values()]
+    .map((product) => {
+      const netSales = product.grossSales - product.sellerDiscount - product.refunds;
+      const grossProfit = netSales - product.cogs;
+      const marketplaceFees =
+        product.marketplaceFeesActual + product.marketplaceFeesEstimated;
+      const netProfit = grossProfit - marketplaceFees;
+      return {
+        key: product.key,
+        productId: product.productId,
+        productName: product.productName,
+        sku: product.sku,
+        category: product.category,
+        unitsSold: product.unitsSold,
+        orderCount: product.orderIds.size,
+        grossSales: product.grossSales,
+        sellerDiscount: product.sellerDiscount,
+        refunds: product.refunds,
+        netSales,
+        cogs: product.cogs,
+        grossProfit,
+        marketplaceFeesActual: product.marketplaceFeesActual,
+        marketplaceFeesEstimated: product.marketplaceFeesEstimated,
+        marketplaceFees,
+        netProfit,
+        marginPercent: netSales > 0 ? (netProfit / netSales) * 100 : null,
+        hasMissingHpp: product.hasMissingHpp,
+      };
+    })
+    .sort(
+      (left, right) =>
+        right.netProfit - left.netProfit || left.productName.localeCompare(right.productName),
+    );
+
+  const totals = rows.reduce(
+    (acc, row) => {
+      acc.unitsSold += row.unitsSold;
+      acc.grossSales += row.grossSales;
+      acc.sellerDiscount += row.sellerDiscount;
+      acc.refunds += row.refunds;
+      acc.netSales += row.netSales;
+      acc.cogs += row.cogs;
+      acc.grossProfit += row.grossProfit;
+      acc.marketplaceFees += row.marketplaceFees;
+      acc.netProfit += row.netProfit;
+      return acc;
+    },
+    {
+      orderCount: orderIds.size,
+      unitsSold: 0,
+      grossSales: 0,
+      sellerDiscount: 0,
+      refunds: 0,
+      netSales: 0,
+      cogs: 0,
+      grossProfit: 0,
+      marketplaceFees: 0,
+      netProfit: 0,
+      marginPercent: null as number | null,
+    },
+  );
+  totals.marginPercent = totals.netSales > 0 ? (totals.netProfit / totals.netSales) * 100 : null;
+
+  return {
+    rows,
+    topProfit: rows.filter((row) => row.netProfit > 0).slice(0, 5),
+    lossMaking: rows
+      .filter((row) => row.netProfit < 0)
+      .sort((left, right) => left.netProfit - right.netProfit),
+    withoutHpp: rows
+      .filter((row) => row.hasMissingHpp)
+      .sort((left, right) => right.grossSales - left.grossSales),
+    totals,
   };
 }
 

@@ -2886,6 +2886,67 @@ code {
   color: var(--text);
 }
 
+.profit-ranking {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: profit-rank;
+}
+
+.profit-ranking li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  counter-increment: profit-rank;
+}
+
+.profit-ranking li:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.profit-ranking li::before {
+  content: counter(profit-rank);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.profit-ranking li > div:first-of-type {
+  flex: 1;
+}
+
+.profit-ranking-value {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: right;
+}
+
+.muted-text {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 /* Settings / backup */
 
 .settings-grid {

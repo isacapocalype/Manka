@@ -8,6 +8,10 @@ import type {
 } from './entities';
 
 export interface FinanceOrderItem {
+  productId: string | null;
+  productName: string;
+  sku: string;
+  category: string | null;
   quantity: number;
   unitPrice: Money;
   hppSnapshot: Money;
@@ -25,6 +29,7 @@ export interface FinanceOrder {
 
 export interface FinanceFee {
   storeId: string;
+  orderId?: string | null;
   feeDate: BusinessDate;
   amount: Money;
   source: FeeSource;
@@ -113,4 +118,54 @@ export interface StoreComparisonRow {
   netSales: Money;
   operatingProfit: Money;
   orderCount: number;
+}
+
+export interface ProductProfitRow {
+  key: string;
+  productId: string | null;
+  productName: string;
+  sku: string;
+  category: string | null;
+  unitsSold: number;
+  orderCount: number;
+  grossSales: Money;
+  sellerDiscount: Money;
+  refunds: Money;
+  netSales: Money;
+  cogs: Money;
+  grossProfit: Money;
+  marketplaceFeesActual: Money;
+  marketplaceFeesEstimated: Money;
+  marketplaceFees: Money;
+  netProfit: Money;
+  marginPercent: number | null;
+  hasMissingHpp: boolean;
+}
+
+export interface ProductProfitTotals {
+  orderCount: number;
+  unitsSold: number;
+  grossSales: Money;
+  sellerDiscount: Money;
+  refunds: Money;
+  netSales: Money;
+  cogs: Money;
+  grossProfit: Money;
+  marketplaceFees: Money;
+  netProfit: Money;
+  marginPercent: number | null;
+}
+
+export interface ProductProfitReport {
+  rows: ProductProfitRow[];
+  topProfit: ProductProfitRow[];
+  lossMaking: ProductProfitRow[];
+  withoutHpp: ProductProfitRow[];
+  totals: ProductProfitTotals;
+}
+
+export interface ProductProfitDataset {
+  orders: FinanceOrder[];
+  fees: FinanceFee[];
+  refunds: FinanceRefund[];
 }

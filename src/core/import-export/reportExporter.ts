@@ -6,6 +6,46 @@ import { toCsv } from './csv';
 
 export type ExportFormat = 'csv' | 'xlsx' | 'pdf';
 
+const PRODUCT_HEADERS = [
+  'Produk',
+  'SKU',
+  'Kategori',
+  'Unit',
+  'Pesanan',
+  'Omzet (Rp)',
+  'Diskon (Rp)',
+  'Refund (Rp)',
+  'Bersih (Rp)',
+  'HPP (Rp)',
+  'Laba kotor (Rp)',
+  'Fee MP (Rp)',
+  'Laba bersih (Rp)',
+  'Margin (%)',
+  'Tanpa HPP',
+];
+
+function productRowValues(
+  row: ReportData['products']['rows'][number],
+): (string | number)[] {
+  return [
+    row.productName,
+    row.sku,
+    row.category ?? '',
+    row.unitsSold,
+    row.orderCount,
+    row.grossSales,
+    row.sellerDiscount,
+    row.refunds,
+    row.netSales,
+    row.cogs,
+    row.grossProfit,
+    row.marketplaceFees,
+    row.netProfit,
+    row.marginPercent === null ? '' : Number(row.marginPercent.toFixed(2)),
+    row.hasMissingHpp ? 'Ya' : 'Tidak',
+  ];
+}
+
 const DAILY_HEADERS = [
   'Tanggal',
   'Pesanan',
@@ -60,6 +100,8 @@ function summaryRows(report: ReportData): [string, string | number][] {
     ['Biaya operasional', s.operationalExpenses],
     ['Laba operasional', s.operatingProfit],
     ['Margin operasional', s.marginPercent === null ? '-' : formatPercent(s.marginPercent)],
+    ['Laba bersih produk', report.products.totals.netProfit],
+    ['Produk tanpa HPP', report.products.withoutHpp.length],
   ];
 }
 
@@ -94,6 +136,12 @@ function exportCsv(report: ReportData): { fileName: string; data: string } {
         String(store.summary.operatingProfit),
       ]);
     }
+  }
+  rows.push([]);
+  rows.push(['Per Produk']);
+  rows.push(PRODUCT_HEADERS);
+  for (const product of report.products.rows) {
+    rows.push(productRowValues(product).map((value) => String(value)));
   }
   return { fileName: `${fileBase(report)}.csv`, data: toCsv(rows[0] ?? [], rows.slice(1)) };
 }
@@ -168,6 +216,29 @@ async function exportXlsx(report: ReportData): Promise<{ fileName: string; data:
     }
   }
 
+  const productSheet = workbook.addWorksheet('Per Produk');
+  productSheet.columns = PRODUCT_HEADERS.map((header) => ({
+    header,
+    key: header,
+    width: header === 'Produk' ? 28 : header === 'SKU' ? 16 : header === 'Kategori' ? 18 : 14,
+  }));
+  productSheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  productSheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563EB' } };
+  for (const product of report.products.rows) {
+    const row = productSheet.addRow(productRowValues(product));
+    for (let index = 6; index <= 13; index += 1) {
+      row.getCell(index).numFmt = '#,##0';
+    }
+    row.getCell(14).numFmt = '0.00';
+  }
+  productSheet.views = [{ state: 'frozen', ySplit: 1 }];
+  if (report.products.rows.length > 0) {
+    productSheet.autoFilter = {
+      from: { row: 1, column: 1 },
+      to: { row: report.products.rows.length + 1, column: PRODUCT_HEADERS.length },
+    };
+  }
+
   const buffer = await workbook.xlsx.writeBuffer();
   return {
     fileName: `${fileBase(report)}.xlsx`,
@@ -207,6 +278,8 @@ async function exportPdf(report: ReportData): Promise<{ fileName: string; data: 
       ['Biaya operasional', formatRupiah(s.operationalExpenses)],
       ['Laba operasional', formatRupiah(s.operatingProfit)],
       ['Margin operasional', s.marginPercent === null ? 'N/A' : formatPercent(s.marginPercent)],
+      ['Laba bersih produk', formatRupiah(report.products.totals.netProfit)],
+      ['Produk tanpa HPP', String(report.products.withoutHpp.length)],
     ],
     theme: 'grid',
     styles: { fontSize: 9, cellPadding: 2 },
@@ -274,6 +347,45 @@ async function exportPdf(report: ReportData): Promise<{ fileName: string; data: 
         );
       }
     },
+  });
+
+  const afterDaily =
+    (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 120;
+  autoTable(doc, {
+    startY: afterDaily + 6,
+    head: [[
+      'Produk',
+      'SKU',
+      'Kategori',
+      'Unit',
+      'Omzet',
+      'HPP',
+      'Fee MP',
+      'Laba bersih',
+      'Margin',
+    ]],
+    body: report.products.rows.map((product) => [
+      product.productName,
+      product.sku,
+      product.category ?? '-',
+      String(product.unitsSold),
+      formatRupiah(product.grossSales),
+      formatRupiah(product.cogs),
+      formatRupiah(product.marketplaceFees),
+      formatRupiah(product.netProfit),
+      product.marginPercent === null ? 'N/A' : formatPercent(product.marginPercent),
+    ]),
+    theme: 'striped',
+    styles: { fontSize: 7.5, cellPadding: 1.5 },
+    headStyles: { fillColor: [37, 99, 235], textColor: 255 },
+    columnStyles: {
+      4: { halign: 'right' },
+      5: { halign: 'right' },
+      6: { halign: 'right' },
+      7: { halign: 'right' },
+      8: { halign: 'right' },
+    },
+    margin: { left: 14, right: 14 },
   });
 
   const buffer = doc.output('arraybuffer');

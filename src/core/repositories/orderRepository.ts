@@ -396,9 +396,11 @@ export class OrderRepository {
   async findForFinance(from: string, to: string): Promise<FinanceOrder[]> {
     const rows = await this.db.query(
       `SELECT o.id, o.store_id, o.order_date, o.status, o.seller_discount, o.marketplace_discount,
+        oi.product_id, oi.product_name, oi.sku, p.category,
         oi.quantity, oi.unit_price, oi.hpp_snapshot
        FROM orders o
        LEFT JOIN order_items oi ON oi.order_id = o.id
+       LEFT JOIN products p ON p.id = oi.product_id
        WHERE o.order_date >= ? AND o.order_date <= ?
        ORDER BY o.order_date ASC, o.id ASC;`,
       [from, to],
@@ -422,6 +424,10 @@ export class OrderRepository {
       const quantity = getNullableNumber(row, 'quantity');
       if (quantity !== null) {
         order.items.push({
+          productId: getNullableString(row, 'product_id'),
+          productName: getNullableString(row, 'product_name') ?? '',
+          sku: getNullableString(row, 'sku') ?? '',
+          category: getNullableString(row, 'category'),
           quantity,
           unitPrice: getNullableNumber(row, 'unit_price') ?? 0,
           hppSnapshot: getNullableNumber(row, 'hpp_snapshot') ?? 0,

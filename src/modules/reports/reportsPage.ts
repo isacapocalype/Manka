@@ -18,10 +18,16 @@ import {
   setButtonLoading,
   showToast,
 } from '@/components/ui/ui';
-import { bindListFilters, listFilterHtml, readListFilters } from '@/components/ui/filters';
+import {
+  bindListFilters,
+  buildRoute,
+  listFilterHtml,
+  readListFilters,
+} from '@/components/ui/filters';
 import { renderLineChart } from '@/components/ui/charts';
 import { financeBreakdown, financeNote } from '@/modules/finance/financeUi';
 import { renderPageError } from '@/app/pageUtils';
+import { productProfitSection } from './productProfitSection';
 
 const EXPORT_BUTTONS: { format: ExportFormat; label: string; iconName: string }[] = [
   { format: 'csv', label: 'CSV', iconName: 'file-text' },
@@ -73,12 +79,22 @@ export const reportsPage: PageRenderer = async (context) => {
 
     const report = await services.reportService.getReport(filters.period, filters.storeId);
     if (context.signal.aborted) return;
-    context.setTitle('Laporan');
+    const tab = context.query.get('tab') === 'products' ? 'products' : 'summary';
+    context.setTitle(tab === 'products' ? 'Laporan produk' : 'Laporan');
 
     const storeName = filters.storeId
       ? stores.find((store) => store.id === filters.storeId)?.name ?? 'Toko'
       : 'Semua toko';
     const active = hasReportActivity(report);
+    const tabLinks = [
+      { id: 'summary', label: 'Ringkasan keuangan' },
+      { id: 'products', label: 'Laba per produk' },
+    ]
+      .map(
+        (item) =>
+          `<a class="tab-link ${item.id === tab ? 'is-active' : ''}" href="#${buildRoute('/reports', context.query, { tab: item.id })}" ${item.id === tab ? 'aria-current="page"' : ''}>${escapeHtml(item.label)}</a>`,
+      )
+      .join('');
     const dailyWithActivity = report.daily.filter(
       (day) =>
         day.orderCount > 0 ||
@@ -104,7 +120,7 @@ export const reportsPage: PageRenderer = async (context) => {
     root.innerHTML = `
       ${pageHeader({
         eyebrow: 'Analitik',
-        title: 'Laporan keuangan',
+        title: tab === 'products' ? 'Laporan laba produk' : 'Laporan keuangan',
         subtitle: `${filters.period.label} · ${storeName}`,
         actions: `
           ${linkButton('/dashboard', 'Dashboard', 'btn btn-secondary', 'layout-dashboard')}
@@ -114,10 +130,12 @@ export const reportsPage: PageRenderer = async (context) => {
 
       ${listFilterHtml(filters, stores)}
 
+      <nav class="tabs" aria-label="Jenis laporan">${tabLinks}</nav>
+
       <div class="report-export-bar">
         <div>
           <strong>Ekspor laporan</strong>
-          <p>File berisi data aktual pada periode dan toko yang dipilih. Tidak ada data contoh.</p>
+          <p>File berisi ringkasan harian dan laba per produk pada periode dan toko yang dipilih.</p>
         </div>
         <div class="report-export-actions">
           ${EXPORT_BUTTONS.map(
@@ -128,7 +146,9 @@ export const reportsPage: PageRenderer = async (context) => {
       </div>
 
       ${
-        active
+        tab === 'products'
+          ? productProfitSection(report)
+          : active
           ? `
             <div class="kpi-grid">
               ${kpiCard({
@@ -244,7 +264,7 @@ export const reportsPage: PageRenderer = async (context) => {
 
     bindListFilters(root, context);
 
-    if (active) {
+    if (active && tab === 'summary') {
       const canvas = root.querySelector<HTMLCanvasElement>('#report-chart');
       if (canvas) {
         const chart = await renderLineChart(
