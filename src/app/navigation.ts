@@ -167,6 +167,7 @@ export const MOBILE_NAV: NavItem[] = [
       '/reports',
       '/production',
       '/materials',
+      '/imports',
       '/health',
       '/settings',
     ],
@@ -185,6 +186,7 @@ export function activeMainHref(path: string): string {
   if (path.startsWith('/products')) return '/products';
   if (path.startsWith('/materials')) return '/materials';
   if (path.startsWith('/reports')) return '/reports';
+  if (path.startsWith('/imports')) return '/more';
   if (path.startsWith('/health')) return '/more';
   if (path.startsWith('/settings')) return '/settings';
   if (path.startsWith('/more')) return '/more';

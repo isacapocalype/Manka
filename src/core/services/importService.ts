@@ -13,194 +13,33 @@ import type { ImportBatchWriteData, ImportErrorWriteData } from '@/core/reposito
 import { isValidBusinessDate } from '@/core/utils/date';
 import { parseIntegerInput, parseMoneyInput } from '@/core/utils/money';
 import { ValidationError } from '@/core/utils/validation';
+import {
+  autoDetectMappingFor,
+  validateMappingFor,
+  type OrderImportFieldKey,
+  type OrderImportMapping,
+} from '@/core/import-export/importFields';
 
-export type OrderImportFieldKey =
-  | 'orderId'
-  | 'orderDate'
-  | 'status'
-  | 'productName'
-  | 'sku'
-  | 'quantity'
-  | 'unitPrice'
-  | 'hpp'
-  | 'sellerDiscount'
-  | 'marketplaceDiscount'
-  | 'shippingPaid'
-  | 'marketplaceFee'
-  | 'refundAmount'
-  | 'refundQuantity'
-  | 'notes';
+export {
+  ORDER_IMPORT_FIELDS,
+  autoDetectMappingFor,
+  validateMappingFor,
+  type ImportFieldKey,
+  type ImportFieldDefinition,
+  type ImportMapping,
+  type OrderImportFieldKey,
+  type OrderImportMapping,
+} from '@/core/import-export/importFields';
 
-export interface ImportFieldDefinition {
-  key: OrderImportFieldKey;
-  label: string;
-  required: boolean;
-  help: string;
-  aliases: string[];
-}
-
-export const ORDER_IMPORT_FIELDS: readonly ImportFieldDefinition[] = [
-  {
-    key: 'orderId',
-    label: 'Nomor pesanan',
-    required: true,
-    help: 'Nomor pesanan unik dari marketplace.',
-    aliases: ['order id', 'order_id', 'no pesanan', 'nomor pesanan', 'no. pesanan', 'order no', 'id pesanan'],
-  },
-  {
-    key: 'orderDate',
-    label: 'Tanggal pesanan',
-    required: true,
-    help: 'Tanggal pesanan (YYYY-MM-DD atau DD/MM/YYYY).',
-    aliases: ['tanggal pesanan', 'order date', 'tanggal', 'waktu pesanan', 'created at', 'order time'],
-  },
-  {
-    key: 'status',
-    label: 'Status',
-    required: true,
-    help: 'Status marketplace akan dipetakan ke status internal.',
-    aliases: ['status pesanan', 'status', 'order status', 'status order'],
-  },
-  {
-    key: 'productName',
-    label: 'Nama produk',
-    required: false,
-    help: 'Nama produk pada baris pesanan. Wajib jika SKU tidak diisi.',
-    aliases: ['nama produk', 'product name', 'produk', 'item name', 'nama item'],
-  },
-  {
-    key: 'sku',
-    label: 'SKU',
-    required: false,
-    help: 'SKU produk. Wajib jika nama produk tidak diisi.',
-    aliases: ['sku', 'seller sku', 'sku produk', 'product sku'],
-  },
-  {
-    key: 'quantity',
-    label: 'Kuantitas',
-    required: true,
-    help: 'Jumlah barang pada baris.',
-    aliases: ['kuantitas', 'quantity', 'qty', 'jumlah', 'jumlah barang'],
-  },
-  {
-    key: 'unitPrice',
-    label: 'Harga satuan',
-    required: true,
-    help: 'Harga jual per barang sebelum potongan.',
-    aliases: ['harga satuan', 'unit price', 'harga', 'price', 'harga jual'],
-  },
-  {
-    key: 'hpp',
-    label: 'HPP',
-    required: false,
-    help: 'Opsional. Jika kosong, HPP diambil dari master produk. Jika produk tidak ditemukan, HPP dianggap 0 dan diberi peringatan.',
-    aliases: ['hpp', 'modal', 'cost', 'harga modal'],
-  },
-  {
-    key: 'sellerDiscount',
-    label: 'Diskon penjual',
-    required: false,
-    help: 'Diskon yang ditanggung penjual. Nilai pesanan, bukan per baris.',
-    aliases: ['diskon penjual', 'seller discount', 'diskon toko'],
-  },
-  {
-    key: 'marketplaceDiscount',
-    label: 'Diskon marketplace',
-    required: false,
-    help: 'Diskon yang ditanggung marketplace. Tidak mengurangi pendapatan penjual.',
-    aliases: ['diskon marketplace', 'marketplace discount', 'diskon platform'],
-  },
-  {
-    key: 'shippingPaid',
-    label: 'Ongkir dibayar pembeli',
-    required: false,
-    help: 'Nilai ongkir yang dibayar pembeli, jika ada.',
-    aliases: ['ongkir', 'shipping', 'ongkos kirim', 'shipping fee'],
-  },
-  {
-    key: 'marketplaceFee',
-    label: 'Biaya marketplace',
-    required: false,
-    help: 'Biaya aktual per pesanan. Akan disimpan sebagai biaya marketplace aktual.',
-    aliases: ['biaya marketplace', 'marketplace fee', 'biaya admin', 'commission', 'fee', 'biaya layanan'],
-  },
-  {
-    key: 'refundAmount',
-    label: 'Nilai refund',
-    required: false,
-    help: 'Jika diisi, refund aktual akan dicatat untuk pesanan ini.',
-    aliases: ['refund', 'nominal refund', 'pengembalian dana', 'refund amount'],
-  },
-  {
-    key: 'refundQuantity',
-    label: 'Jumlah barang refund',
-    required: false,
-    help: 'Opsional. Default memakai seluruh kuantitas pesanan.',
-    aliases: ['jumlah refund', 'refund quantity', 'qty refund'],
-  },
-  {
-    key: 'notes',
-    label: 'Catatan',
-    required: false,
-    help: 'Catatan tambahan untuk pesanan.',
-    aliases: ['catatan', 'notes', 'remark', 'keterangan'],
-  },
-];
-
-export type OrderImportMapping = Record<OrderImportFieldKey, string | null>;
-
-function normalizeHeader(value: string): string {
-  return value.toLowerCase().replace(/[_\-.]+/g, ' ').replace(/\s+/g, ' ').trim();
-}
-
+/** Kompatibel dengan pemanggil lama: mapping pesanan selalu lengkap. */
 export function autoDetectMapping(headers: string[]): OrderImportMapping {
-  const mapping = Object.fromEntries(
-    ORDER_IMPORT_FIELDS.map((field) => [field.key, null]),
-  ) as OrderImportMapping;
-  const used = new Set<string>();
-  for (const field of ORDER_IMPORT_FIELDS) {
-    const match = headers.find((header) => {
-      if (used.has(header)) return false;
-      const normalized = normalizeHeader(header);
-      return field.aliases.some((alias) => normalized === alias || normalized.includes(alias));
-    });
-    if (match) {
-      mapping[field.key] = match;
-      used.add(match);
-    }
-  }
-  return mapping;
+  return autoDetectMappingFor(headers, 'orders') as OrderImportMapping;
 }
 
+/** Kompatibel dengan pemanggil lama: validasi terhadap field pesanan. */
 export function validateMapping(mapping: OrderImportMapping, headers: string[]): string[] {
-  const errors: string[] = [];
-  const headerSet = new Set(headers);
-  const used = new Map<string, string>();
-  for (const field of ORDER_IMPORT_FIELDS) {
-    const header = mapping[field.key];
-    if (header !== null && !headerSet.has(header)) {
-      errors.push(`Kolom "${header}" untuk ${field.label} tidak ditemukan.`);
-    }
-    if (header !== null) {
-      const existing = used.get(header);
-      if (existing) {
-        errors.push(`Kolom "${header}" dipetakan ke lebih dari satu field (${existing} dan ${field.label}).`);
-      } else {
-        used.set(header, field.label);
-      }
-    }
-  }
-  for (const field of ORDER_IMPORT_FIELDS) {
-    if (field.required && mapping[field.key] === null) {
-      errors.push(`${field.label} wajib dipetakan.`);
-    }
-  }
-  if (mapping.productName === null && mapping.sku === null) {
-    errors.push('Pilih minimal salah satu kolom Nama produk atau SKU.');
-  }
-  return errors;
+  return validateMappingFor(mapping, headers, 'orders');
 }
-
 export interface ImportRowIssue {
   rowNumber: number;
   message: string;
@@ -277,7 +116,8 @@ class RowValueReader {
   }
 }
 
-function parseImportDate(raw: string): string | null {
+/** Parser tanggal bersama untuk seluruh wizard import. */
+export function parseImportDate(raw: string): string | null {
   const value = raw.trim();
   if (value === '') return null;
   const isoMatch = /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/.exec(value);

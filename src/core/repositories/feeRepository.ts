@@ -23,6 +23,16 @@ export interface FeeFilters {
   pageSize?: number;
 }
 
+/** Tanda tangan biaya untuk mendeteksi biaya yang sudah pernah diimpor. */
+export function feeImportSignature(
+  orderId: string,
+  feeType: FeeType,
+  amount: number,
+  feeDate: string,
+): string {
+  return `${orderId}\u0000${feeType}\u0000${amount}\u0000${feeDate}`;
+}
+
 export interface FeeWriteData {
   storeId: string;
   orderId: string | null;
@@ -165,6 +175,24 @@ export class FeeRepository {
 
   async delete(id: string): Promise<void> {
     await this.db.execute('DELETE FROM marketplace_fees WHERE id = ?;', [id]);
+  }
+
+  async findImportSignatures(storeId: string): Promise<Set<string>> {
+    const rows = await this.db.query(
+      `SELECT order_id, fee_type, amount, fee_date FROM marketplace_fees
+       WHERE store_id = ? AND order_id IS NOT NULL AND source = 'actual';`,
+      [storeId],
+    );
+    return new Set(
+      rows.map((row) =>
+        feeImportSignature(
+          getString(row, 'order_id'),
+          getString(row, 'fee_type') as FeeType,
+          getNumber(row, 'amount'),
+          getString(row, 'fee_date'),
+        ),
+      ),
+    );
   }
 
   async findForFinance(from: string, to: string): Promise<FinanceFee[]> {

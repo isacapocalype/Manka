@@ -292,6 +292,33 @@ export class OrderRepository {
     return existing;
   }
 
+  /** Info pesanan marketplace → internal untuk menghubungkan biaya import. */
+  async findImportOrderInfo(
+    storeId: string,
+    ids: string[],
+  ): Promise<Map<string, { id: string; orderDate: string }>> {
+    const result = new Map<string, { id: string; orderDate: string }>();
+    const unique = [...new Set(ids)];
+    const chunkSize = 400;
+    for (let offset = 0; offset < unique.length; offset += chunkSize) {
+      const chunk = unique.slice(offset, offset + chunkSize);
+      if (chunk.length === 0) continue;
+      const placeholders = chunk.map(() => '?').join(', ');
+      const rows = await this.db.query(
+        `SELECT id, marketplace_order_id, order_date FROM orders
+         WHERE store_id = ? AND marketplace_order_id IN (${placeholders});`,
+        [storeId, ...chunk],
+      );
+      for (const row of rows) {
+        result.set(getString(row, 'marketplace_order_id'), {
+          id: getString(row, 'id'),
+          orderDate: getString(row, 'order_date'),
+        });
+      }
+    }
+    return result;
+  }
+
   async insertOrder(data: OrderCreateData, items: OrderItemCreateData[], tx: SqlExecutor): Promise<string> {
     const id = createId();
     const timestamp = nowIso();

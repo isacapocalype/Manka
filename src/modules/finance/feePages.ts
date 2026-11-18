@@ -55,6 +55,13 @@ function addFeeHref(storeId: string | null): string {
   return `/finance/fees/new?${params.toString()}`;
 }
 
+function importFeesHref(storeId: string | null): string {
+  const params = new URLSearchParams();
+  if (storeId) params.set('storeId', storeId);
+  const query = params.toString();
+  return `/finance/fees/import${query === '' ? '' : `?${query}`}`;
+}
+
 export const feeListPage: PageRenderer = async (context) => {
   const { root, services } = context;
   root.innerHTML = loadingBlock('Memuat biaya marketplace…');
@@ -121,7 +128,10 @@ export const feeListPage: PageRenderer = async (context) => {
         eyebrow: 'Keuangan',
         title: 'Biaya marketplace',
         subtitle: `${formatNumber(fees.total)} biaya pada filter aktif. Estimasi diberi label terpisah dari biaya aktual.`,
-        actions: linkButton(addFeeHref(filters.storeId), 'Catat biaya', 'btn btn-primary', 'plus'),
+        actions: `
+          ${linkButton(importFeesHref(filters.storeId), 'Import laporan', 'btn btn-secondary', 'upload')}
+          ${linkButton(addFeeHref(filters.storeId), 'Catat biaya', 'btn btn-primary', 'plus')}
+        `,
       })}
 
       ${listFilterHtml(filters, stores)}

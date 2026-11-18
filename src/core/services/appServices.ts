@@ -11,6 +11,7 @@ import { OperationalExpenseRepository } from '@/core/repositories/operationalExp
 import { RefundRepository } from '@/core/repositories/refundRepository';
 import { SettlementRepository } from '@/core/repositories/settlementRepository';
 import { ImportRepository } from '@/core/repositories/importRepository';
+import { ImportTemplateRepository } from '@/core/repositories/importTemplateRepository';
 import { SettingsRepository } from '@/core/repositories/settingsRepository';
 import { BackupRepository } from '@/core/repositories/backupRepository';
 import { WorkOrderRepository } from '@/core/repositories/workOrderRepository';
@@ -26,6 +27,8 @@ import { OperationalExpenseService } from './operationalExpenseService';
 import { RefundService } from './refundService';
 import { SettlementService } from './settlementService';
 import { OrderImportService } from './importService';
+import { ImportTemplateService } from './importTemplateService';
+import { MarketplaceImportService } from './marketplaceImportService';
 import { BackupService } from './backupService';
 import { FinancialService } from './financialService';
 import { DashboardService } from './dashboardService';
@@ -50,6 +53,7 @@ export interface AppServices {
   refunds: RefundRepository;
   settlements: SettlementRepository;
   imports: ImportRepository;
+  importTemplates: ImportTemplateRepository;
   settings: SettingsRepository;
   backupRepo: BackupRepository;
   workOrders: WorkOrderRepository;
@@ -65,6 +69,9 @@ export interface AppServices {
   refundService: RefundService;
   settlementService: SettlementService;
   importService: OrderImportService;
+  importTemplateService: ImportTemplateService;
+  feeImportService: MarketplaceImportService;
+  settlementImportService: MarketplaceImportService;
   backupService: BackupService;
   financeService: FinancialService;
   dashboardService: DashboardService;
@@ -92,6 +99,7 @@ export function createAppServices(
   const refunds = new RefundRepository(db);
   const settlements = new SettlementRepository(db);
   const imports = new ImportRepository(db);
+  const importTemplates = new ImportTemplateRepository(db);
   const settings = new SettingsRepository(db);
   const backupRepo = new BackupRepository(db);
   const workOrders = new WorkOrderRepository(db);
@@ -116,6 +124,27 @@ export function createAppServices(
     fees,
     refunds,
     imports,
+    audit,
+  );
+  const importTemplateService = new ImportTemplateService(importTemplates, audit);
+  const feeImportService = new MarketplaceImportService(
+    db,
+    stores,
+    orders,
+    fees,
+    settlements,
+    imports,
+    cashService,
+    audit,
+  );
+  const settlementImportService = new MarketplaceImportService(
+    db,
+    stores,
+    orders,
+    fees,
+    settlements,
+    imports,
+    cashService,
     audit,
   );
   const backupService = new BackupService(backupRepo, encryption, audit, settings);
@@ -148,6 +177,7 @@ export function createAppServices(
     refunds,
     settlements,
     imports,
+    importTemplates,
     settings,
     backupRepo,
     workOrders,
@@ -163,6 +193,9 @@ export function createAppServices(
     refundService,
     settlementService,
     importService,
+    importTemplateService,
+    feeImportService,
+    settlementImportService,
     backupService,
     financeService,
     dashboardService,

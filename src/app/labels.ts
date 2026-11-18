@@ -227,6 +227,10 @@ export const CASH_SOURCE_TYPE_TONES: Record<CashEntrySourceType, BadgeTone> = {
 export const IMPORT_TYPE_LABELS: Record<string, string> = {
   orders: 'Pesanan',
   order: 'Pesanan',
+  fees: 'Biaya marketplace',
+  fee: 'Biaya marketplace',
+  settlements: 'Settlement',
+  settlement: 'Settlement',
 };
 
 export function labelForImportType(value: string): string {

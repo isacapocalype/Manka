@@ -32,6 +32,12 @@ const MAIN_LINKS: MoreLink[] = [
     iconName: 'upload',
   },
   {
+    href: '/imports/templates',
+    label: 'Template import',
+    description: 'Kelola pemetaan kolom tersimpan per marketplace untuk pesanan, biaya, dan settlement.',
+    iconName: 'clipboard-list',
+  },
+  {
     href: '/production',
     label: 'Produksi',
     description:
@@ -85,6 +91,12 @@ const FINANCE_LINKS: MoreLink[] = [
     iconName: 'credit-card',
   },
   {
+    href: '/finance/fees/import',
+    label: 'Import biaya',
+    description: 'Tarik laporan potongan marketplace menjadi biaya aktual per pesanan.',
+    iconName: 'upload',
+  },
+  {
     href: '/finance/ads',
     label: 'Iklan',
     description: 'Kampanye dan biaya iklan.',
@@ -107,6 +119,12 @@ const FINANCE_LINKS: MoreLink[] = [
     label: 'Settlement',
     description: 'Pencairan dana sebagai arus kas.',
     iconName: 'banknote',
+  },
+  {
+    href: '/finance/settlements/import',
+    label: 'Import settlement',
+    description: 'Tarik laporan pencairan dan catat kas masuk otomatis.',
+    iconName: 'upload',
   },
 ];
 

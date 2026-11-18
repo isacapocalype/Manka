@@ -321,6 +321,19 @@ export const BACKUP_TABLES: readonly BackupTableDefinition[] = [
     columnSince: { account_id: 4 },
   },
   {
+    name: 'import_templates',
+    since: 5,
+    columns: [
+      'id',
+      'name',
+      'marketplace',
+      'import_type',
+      'mapping_json',
+      'created_at',
+      'updated_at',
+    ],
+  },
+  {
     name: 'import_batches',
     columns: [
       'id',

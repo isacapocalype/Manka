@@ -51,6 +51,13 @@ function addSettlementHref(storeId: string | null): string {
   return `/finance/settlements/new?${params.toString()}`;
 }
 
+function importSettlementsHref(storeId: string | null): string {
+  const params = new URLSearchParams();
+  if (storeId) params.set('storeId', storeId);
+  const query = params.toString();
+  return `/finance/settlements/import${query === '' ? '' : `?${query}`}`;
+}
+
 export const settlementListPage: PageRenderer = async (context) => {
   const { root, services } = context;
   root.innerHTML = loadingBlock('Memuat settlement…');
@@ -121,7 +128,10 @@ export const settlementListPage: PageRenderer = async (context) => {
         eyebrow: 'Keuangan',
         title: 'Settlement & pencairan',
         subtitle: `${formatNumber(settlements.total)} settlement pada filter aktif. Pencairan adalah arus kas, bukan omzet baru.`,
-        actions: linkButton(addSettlementHref(filters.storeId), 'Catat settlement', 'btn btn-primary', 'plus'),
+        actions: `
+          ${linkButton(importSettlementsHref(filters.storeId), 'Import laporan', 'btn btn-secondary', 'upload')}
+          ${linkButton(addSettlementHref(filters.storeId), 'Catat settlement', 'btn btn-primary', 'plus')}
+        `,
       })}
 
       ${listFilterHtml(filters, stores)}

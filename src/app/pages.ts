@@ -13,6 +13,11 @@ import { orderListPage } from '@/modules/orders/orderListPage';
 import { orderDetailPage } from '@/modules/orders/orderDetailPage';
 import { orderFormPage } from '@/modules/orders/orderFormPage';
 import { orderImportPage } from '@/modules/orders/orderImportPage';
+import { feeImportPage, settlementImportPage } from '@/modules/imports/marketplaceImportPage';
+import {
+  importTemplateFormPage,
+  importTemplateListPage,
+} from '@/modules/imports/importTemplatePages';
 import { productionListPage } from '@/modules/production/productionListPage';
 import { productionFormPage } from '@/modules/production/productionFormPage';
 import { productionDetailPage } from '@/modules/production/productionDetailPage';
@@ -65,6 +70,14 @@ export const APP_ROUTES: RouteDefinition[] = [
   { path: '/orders/:id', title: 'Detail pesanan', render: orderDetailPage },
   { path: '/orders/:id/edit', title: 'Ubah pesanan', render: orderFormPage },
 
+  { path: '/imports/templates', title: 'Template import', render: importTemplateListPage },
+  { path: '/imports/templates/new', title: 'Template import baru', render: importTemplateFormPage },
+  {
+    path: '/imports/templates/:id/edit',
+    title: 'Ubah template import',
+    render: importTemplateFormPage,
+  },
+
   { path: '/production', title: 'Produksi', render: productionListPage },
   { path: '/production/new', title: 'Work order baru', render: productionFormPage },
   { path: '/production/:id', title: 'Detail work order', render: productionDetailPage },
@@ -88,6 +101,7 @@ export const APP_ROUTES: RouteDefinition[] = [
   { path: '/finance/cash/:id/edit', title: 'Ubah rekening kas', render: cashAccountFormPage },
 
   { path: '/finance/fees', title: 'Biaya marketplace', render: feeListPage },
+  { path: '/finance/fees/import', title: 'Import biaya marketplace', render: feeImportPage },
   { path: '/finance/fees/new', title: 'Biaya marketplace baru', render: feeFormPage },
   { path: '/finance/fees/:id/edit', title: 'Ubah biaya marketplace', render: feeFormPage },
 
@@ -116,6 +130,7 @@ export const APP_ROUTES: RouteDefinition[] = [
   { path: '/finance/refunds/:id/edit', title: 'Ubah refund', render: refundFormPage },
 
   { path: '/finance/settlements', title: 'Settlement', render: settlementListPage },
+  { path: '/finance/settlements/import', title: 'Import settlement', render: settlementImportPage },
   { path: '/finance/settlements/new', title: 'Settlement baru', render: settlementFormPage },
   {
     path: '/finance/settlements/:id/edit',

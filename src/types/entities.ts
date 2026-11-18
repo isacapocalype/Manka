@@ -394,6 +394,22 @@ export interface SettlementInput {
   accountId?: string | null;
 }
 
+export const IMPORT_TYPES = ['orders', 'fees', 'settlements'] as const;
+export type ImportType = (typeof IMPORT_TYPES)[number];
+
+/** Pemetaan kolom file ke field import. Null berarti kolom tidak dipakai. */
+export type ImportMappingValues = Record<string, string | null>;
+
+export interface ImportTemplate {
+  id: string;
+  name: string;
+  marketplace: StorePlatform;
+  importType: ImportType;
+  mapping: ImportMappingValues;
+  createdAt: IsoDateTime;
+  updatedAt: IsoDateTime;
+}
+
 export interface ImportBatch {
   id: string;
   importType: string;

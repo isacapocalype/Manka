@@ -18,7 +18,7 @@ Dokumen sumber:
 - **Produksi** — work order dari item pesanan atau manual, tahap antrian → potong → jahit → finishing → QC → packing → selesai, PIC/vendor, tenggat, kuantitas lolos/cacat, dan riwayat tahap.
 - **Keuangan** — biaya marketplace, iklan (kampanye + biaya), biaya operasional (per toko atau bersama), refund, settlement, kas/rekening (tunai, bank, e-wallet), buku besar, transfer, dan rekonsiliasi.
 - **Laporan** — periode hari ini, minggu ini/lalu, 7/30 hari, bulan ini/lalu, tahun ini, dan rentang kustom; semua toko atau per toko; ekspor CSV, XLSX, dan PDF berisi data aktual.
-- **Import pesanan** — CSV/XLSX dengan pratinjau, pemetaan kolom, validasi per baris, deteksi duplikat, dan eksekusi transaksional.
+- **Import marketplace** — CSV/XLSX pesanan, laporan biaya, dan laporan settlement dengan pratinjau, pemetaan kolom, validasi per baris, deteksi duplikat, template pemetaan tersimpan, dan eksekusi transaksional.
 - **Backup/restore** — snapshot logis seluruh data + kunci enkripsi, dibungkus password, dapat disalin keluar aplikasi.
 - **Audit log** — mencatat perubahan data penting dan akses data sensitif tanpa menyimpan nilainya.
 - **Responsif** — sidebar desktop dan bottom navigation mobile.
@@ -163,9 +163,11 @@ Semua nominal disimpan sebagai **integer Rupiah**; tidak ada floating point untu
 - Biaya bersama (tanpa toko) hanya muncul pada total semua toko dan tidak dialokasikan ke toko tertentu.
 - ROAS/ACOS menampilkan `N/A` bila tidak ada pendapatan teratribusi.
 
-## Import Pesanan
+## Import Marketplace
 
-Halaman: **Pesanan → Import**. Format CSV atau XLSX, maksimal 12 MB.
+Halaman: **Pesanan → Import**, **Keuangan → Biaya marketplace → Import laporan**, dan **Keuangan → Settlement → Import laporan**. Format CSV atau XLSX, maksimal 12 MB. Seluruh pemrosesan terjadi di perangkat; tidak ada pengambilan data otomatis dari marketplace.
+
+### Import pesanan
 
 Kolom yang dikenali (header fleksibel, dapat dipetakan manual):
 
@@ -184,27 +186,51 @@ Kolom yang dikenali (header fleksibel, dapat dipetakan manual):
 | Nilai refund / jumlah refund | Tidak | Refund selesai |
 | Catatan | Tidak | Teks |
 
-Alur:
+### Import biaya marketplace
 
-1. Pilih toko dan file.
-2. Pratinjau baris + deteksi duplikat dan error.
-3. Petakan kolom yang tidak terdeteksi otomatis.
-4. Eksekusi dalam satu transaksi.
+| Kolom | Wajib | Keterangan |
+| --- | --- | --- |
+| Nomor pesanan | Ya | Harus sudah ada pada toko yang dipilih |
+| Tanggal biaya | Tidak | Default tanggal pesanan |
+| Jenis biaya | Tidak | Default `lainnya`; dikenali komisi, promosi, transaksi, layanan, admin |
+| Nominal biaya | Ya | Rupiah |
+| Catatan | Tidak | Teks |
+
+Biaya disimpan sebagai biaya **aktual** dan terhubung ke pesanan internal. Duplikat dideteksi dari kombinasi pesanan internal + jenis + nominal + tanggal.
+
+### Import settlement
+
+| Kolom | Wajib | Keterangan |
+| --- | --- | --- |
+| Nomor settlement | Ya | Unik per toko |
+| Tanggal settlement | Ya | Format ISO atau format tanggal Indonesia |
+| Total penjualan | Tidak | Default `total pencairan + total potongan` |
+| Total potongan | Tidak | Default 0 |
+| Total pencairan | Ya | Rupiah, dicatat sebagai kas masuk |
+| Status | Tidak | Default `diterima`; nilai dikenali diterima/pending |
+| Catatan | Tidak | Teks |
+
+Settlement berstatus **diterima** wajib memiliki rekening tujuan dan langsung memposting kas masuk sebesar total pencairan. Settlement pending tidak memposting kas. Peringatan ditampilkan bila `penjualan − potongan ≠ pencairan`.
+
+### Alur dan perilaku
+
+1. Pilih toko (dan rekening tujuan untuk settlement), lalu file.
+2. Petakan kolom — auto-deteksi atau pakai template tersimpan.
+3. Pratinjau: baris siap, duplikat, dan baris bermasalah ditampilkan terpisah.
+4. Eksekusi seluruh baris valid dalam satu transaksi database.
 5. Lihat ringkasan hasil dan detail error per baris.
 
-Perilaku:
-
-- Baris dengan nomor pesanan sama digabung menjadi satu pesanan (multi-item).
-- Pesanan yang sudah ada dilewati, sehingga import ulang tidak menggandakan data.
-- Produk tidak dikenal tetap diimpor dengan HPP 0 dan peringatan.
+- Baris pesanan dengan nomor sama digabung menjadi satu pesanan (multi-item).
+- Data yang sudah ada dilewati, sehingga import ulang tidak menggandakan data.
 - Baris gagal tidak membatalkan baris valid; detail error disimpan di riwayat import.
 - Nominal dan tanggal divalidasi sebelum penulisan.
+- Template pemetaan dikelola di **Lainnya → Template import** (`#/imports/templates`) atau disimpan langsung dari wizard import. Template menyimpan nama kolom per marketplace + jenis import, bukan data transaksi, dan ikut serta dalam backup terenkripsi.
 
 ## Backup & Restore
 
 Halaman: **Pengaturan**.
 
-- Backup menghasilkan file `.manka` berisi seluruh tabel data (toko, produk, material, BOM, riwayat HPP/harga, pesanan, item, work order produksi, biaya, iklan, refund, settlement, rekening kas, buku besar, transfer, rekonsiliasi, import, audit, pengaturan) **dan kunci enkripsi profil**.
+- Backup menghasilkan file `.manka` berisi seluruh tabel data (toko, produk, material, BOM, riwayat HPP/harga, pesanan, item, work order produksi, biaya, iklan, refund, settlement, rekening kas, buku besar, transfer, rekonsiliasi, template import, import, audit, pengaturan) **dan kunci enkripsi profil**.
 - File adalah envelope JSON `format: "manka-backup", version: 1` dengan PBKDF2-SHA-256 dan AES-GCM. Kata sandi minimal 8 karakter.
 - Di browser file diunduh; di Android file ditulis ke Cache lalu dibagikan melalui Share sheet agar dapat disimpan keluar aplikasi.
 - Restore selalu **inspeksi dulu**: file dan sandi divalidasi, versi skema diperiksa, ringkasan tabel ditampilkan. Pengguna harus mengetik `PULIHKAN` sebelum data diganti.
@@ -253,7 +279,7 @@ Routing memakai hash (`#/...`) agar kompatibel dengan WebView tanpa server. Rute
 npm test
 ```
 
-Mencakup 96 test pada 14 file: kalkulasi finansial, HPP pesanan dan BOM, tanggal/periode, parsing CSV, enkripsi, import (validasi/duplikat/transaksi), backup/restore lintas versi skema, produksi, kas/rekening (posting otomatis, transfer, rekonsiliasi), dan normalisasi tautan navigasi hash. Test memakai `sql.js` asli di Node melalui `tests/helpers/testContext.ts`, bukan mock database.
+Mencakup 108 test pada 17 file: kalkulasi finansial, HPP pesanan dan BOM, tanggal/periode, parsing CSV, enkripsi, import pesanan/biaya/settlement (validasi, duplikat, transaksi, template mapping), backup/restore lintas versi skema, produksi, kas/rekening (posting otomatis, transfer, rekonsiliasi), dan normalisasi tautan navigasi hash. Test memakai `sql.js` asli di Node melalui `tests/helpers/testContext.ts`, bukan mock database.
 
 Pemeriksaan akhir yang disarankan:
 

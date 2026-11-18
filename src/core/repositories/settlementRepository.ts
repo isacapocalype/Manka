@@ -109,6 +109,24 @@ export class SettlementRepository {
     return rows[0] ? mapSettlement(rows[0]) : null;
   }
 
+  async findExistingNumbers(storeId: string, numbers: string[]): Promise<Set<string>> {
+    const existing = new Set<string>();
+    const unique = [...new Set(numbers)];
+    const chunkSize = 400;
+    for (let offset = 0; offset < unique.length; offset += chunkSize) {
+      const chunk = unique.slice(offset, offset + chunkSize);
+      if (chunk.length === 0) continue;
+      const placeholders = chunk.map(() => '?').join(', ');
+      const rows = await this.db.query(
+        `SELECT settlement_no FROM settlements
+         WHERE store_id = ? AND settlement_no IN (${placeholders});`,
+        [storeId, ...chunk],
+      );
+      for (const row of rows) existing.add(getString(row, 'settlement_no'));
+    }
+    return existing;
+  }
+
   async findByNumber(storeId: string, settlementNo: string): Promise<Settlement | null> {
     const rows = await this.db.query(
       'SELECT * FROM settlements WHERE store_id = ? AND settlement_no = ?;',

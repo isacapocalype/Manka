@@ -1,4 +1,5 @@
 import type { PageRenderer } from '@/app/router';
+import type { ImportTemplate, StorePlatform } from '@/types/entities';
 import type { TabularData } from '@/core/import-export/spreadsheet';
 import type {
   ImportExecutionResult,
@@ -40,6 +41,7 @@ interface ImportState {
   mapping: OrderImportMapping | null;
   preview: OrderImportPreview | null;
   result: ImportExecutionResult | null;
+  templates: ImportTemplate[];
 }
 
 const TEMPLATE_HEADERS = [
@@ -106,6 +108,37 @@ function clearError(root: HTMLElement): void {
   }
 }
 
+function templateBarHtml(templates: ImportTemplate[]): string {
+  return `
+    <div class="inline-note">
+      ${icon('clipboard-list')}
+      <span>Pakai template yang tersimpan untuk marketplace ini, atau simpan mapping saat ini.</span>
+    </div>
+    <div class="form-grid">
+      <div class="field">
+        <label class="field-label" for="import-template">Template tersimpan</label>
+        <select class="input select" id="import-template" data-template-select>
+          <option value="">— Pilih template —</option>
+          ${templates
+            .map(
+              (template) =>
+                `<option value="${escapeAttr(template.id)}">${escapeHtml(template.name)} · ${escapeHtml(template.marketplace)}</option>`,
+            )
+            .join('')}
+        </select>
+      </div>
+      <div class="field">
+        <label class="field-label" for="template-save-name">Simpan mapping saat ini</label>
+        <div class="inline-actions">
+          <input class="input" id="template-save-name" data-template-name placeholder="Nama template" maxlength="100" />
+          <button type="button" class="btn btn-secondary" data-save-template>${icon('save')}<span>Simpan</span></button>
+        </div>
+      </div>
+    </div>
+    <button type="button" class="btn btn-ghost" data-apply-template ${templates.length === 0 ? 'disabled' : ''}>${icon('refresh-cw')}<span>Pakai template terpilih</span></button>
+  `;
+}
+
 function formatCandidateItems(candidate: OrderImportPreview['candidates'][number]): string {
   const units = candidate.items.reduce((total, item) => total + item.quantity, 0);
   return `${formatNumber(candidate.items.length)} item · ${formatNumber(units)} unit`;
@@ -161,15 +194,23 @@ export const orderImportPage: PageRenderer = async (context) => {
     }
 
     const requestedStore = context.query.get('storeId');
+    const initialStoreId = activeStores.some((store) => store.id === requestedStore)
+      ? (requestedStore as string)
+      : (activeStores[0]?.id ?? '');
+    const storePlatform = (storeId: string): StorePlatform =>
+      activeStores.find((store) => store.id === storeId)?.platform ?? 'other';
+    const initialTemplates = await services.importTemplateService
+      .list('orders', storePlatform(initialStoreId))
+      .catch(() => []);
+
     const state: ImportState = {
       step: 1,
-      storeId: activeStores.some((store) => store.id === requestedStore)
-        ? (requestedStore as string)
-        : (activeStores[0]?.id ?? ''),
+      storeId: initialStoreId,
       tabular: null,
       mapping: null,
       preview: null,
       result: null,
+      templates: initialTemplates,
     };
 
     const reset = (): void => {
@@ -184,6 +225,10 @@ export const orderImportPage: PageRenderer = async (context) => {
     const goToStep = (step: ImportStep): void => {
       state.step = step;
       render();
+    };
+
+    const reloadTemplates = async (): Promise<void> => {
+      state.templates = await services.importTemplateService.list('orders', storePlatform(state.storeId));
     };
 
     const renderStepOne = (): string => {
@@ -243,6 +288,7 @@ export const orderImportPage: PageRenderer = async (context) => {
           body: `
             ${errorBanner()}
             <p class="inline-note">${icon('file-spreadsheet')} <strong>${escapeHtml(tabular.fileName)}</strong></p>
+            ${templateBarHtml(state.templates)}
             <div class="mapping-grid">
               ${ORDER_IMPORT_FIELDS.map(
                 (field) => `
@@ -457,9 +503,14 @@ export const orderImportPage: PageRenderer = async (context) => {
 
     const bindEvents = (): void => {
       const storeSelect = root.querySelector<HTMLSelectElement>('[data-field="storeId"] select, select[name="storeId"]');
-      storeSelect?.addEventListener('change', () => {
+      storeSelect?.addEventListener('change', async () => {
         state.storeId = storeSelect.value;
         state.preview = null;
+        try {
+          await reloadTemplates();
+        } catch {
+          state.templates = [];
+        }
       });
 
       root.querySelector<HTMLButtonElement>('[data-download-template]')?.addEventListener('click', async (event) => {
@@ -518,6 +569,46 @@ export const orderImportPage: PageRenderer = async (context) => {
       }
 
       if (state.step === 2 && state.mapping) {
+        root.querySelector<HTMLButtonElement>('[data-apply-template]')?.addEventListener('click', () => {
+          const templateId = root.querySelector<HTMLSelectElement>('[data-template-select]')?.value ?? '';
+          const template = state.templates.find((item) => item.id === templateId);
+          if (!template || !state.tabular) {
+            setError(root, 'Pilih template tersimpan terlebih dahulu.');
+            return;
+          }
+          state.mapping = services.importTemplateService.apply(
+            template,
+            state.tabular.headers,
+          ) as OrderImportMapping;
+          state.preview = null;
+          render();
+          showToast(`Template "${template.name}" diterapkan.`, 'success');
+        });
+
+        root.querySelector<HTMLButtonElement>('[data-save-template]')?.addEventListener('click', async (event) => {
+          const button = event.currentTarget as HTMLButtonElement;
+          const name = root.querySelector<HTMLInputElement>('[data-template-name]')?.value.trim() ?? '';
+          if (!name || !state.mapping) {
+            setError(root, 'Isi nama template terlebih dahulu.');
+            return;
+          }
+          setButtonLoading(button, true, 'Menyimpan…');
+          try {
+            await services.importTemplateService.create({
+              name,
+              marketplace: storePlatform(state.storeId),
+              importType: 'orders',
+              mapping: state.mapping,
+            });
+            await reloadTemplates();
+            render();
+            showToast('Template mapping disimpan.', 'success');
+          } catch (error) {
+            setButtonLoading(button, false);
+            setError(root, error instanceof Error ? error.message : 'Template gagal disimpan.');
+          }
+        });
+
         root.querySelectorAll<HTMLSelectElement>('[data-map-field]').forEach((select) => {
           select.addEventListener('change', () => {
             if (!state.mapping) return;
