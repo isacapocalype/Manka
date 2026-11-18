@@ -1798,6 +1798,213 @@ code {
   margin: 0 16px 16px;
 }
 
+/* Production */
+
+.production-stage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.production-stage-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 13px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--surface);
+  color: inherit;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.production-stage-card:hover {
+  border-color: var(--primary);
+}
+
+.production-stage-card.is-active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.production-stage-card.has-overdue {
+  border-color: #fecaca;
+}
+
+.production-stage-card strong {
+  font-size: 21px;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.production-stage-name {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.production-stage-meta {
+  color: var(--text-secondary);
+  font-size: 10.5px;
+}
+
+.production-progress {
+  height: 7px;
+  margin-bottom: 18px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  overflow: hidden;
+}
+
+.production-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--primary), #22c55e);
+  transition: width 200ms ease;
+}
+
+.production-pipeline {
+  display: flex;
+  align-items: flex-start;
+  margin: 0;
+  padding: 0 0 2px;
+  list-style: none;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.production-pipeline::-webkit-scrollbar {
+  display: none;
+}
+
+.production-step {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 78px;
+  text-align: center;
+}
+
+.production-step::before {
+  content: '';
+  position: absolute;
+  top: 13px;
+  left: -50%;
+  width: 100%;
+  height: 2px;
+  background: var(--border);
+  z-index: 0;
+}
+
+.production-step:first-child::before {
+  display: none;
+}
+
+.production-step.is-done::before,
+.production-step.is-current::before {
+  background: var(--primary);
+}
+
+.production-step-dot {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 27px;
+  height: 27px;
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.production-step.is-done .production-step-dot {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+}
+
+.production-step.is-current .production-step-dot {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+}
+
+.production-step.is-cancelled .production-step-dot {
+  border-color: #fecaca;
+  color: var(--danger);
+}
+
+.production-step-label {
+  color: var(--text-secondary);
+  font-size: 10.5px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.production-step.is-done .production-step-label,
+.production-step.is-current .production-step-label {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.production-stage-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-bottom: 15px;
+  padding: 11px 12px;
+  border: 1px solid #dbe8ff;
+  border-radius: 9px;
+  background: var(--primary-soft);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+
+.production-stage-note svg {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--primary);
+}
+
+.production-links {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+}
+
+.production-inline-note {
+  margin: 0 0 14px;
+}
+
+.form-static-value {
+  margin: 0;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  font-size: 12.5px;
+}
+
+.detail-list-compact > div {
+  padding: 7px 0;
+}
+
 .security-note,
 .security-banner {
   display: flex;

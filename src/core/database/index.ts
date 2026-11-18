@@ -3,6 +3,7 @@ import type { Database } from './types';
 import { openNativeDatabase } from './native';
 import { openWebDatabase } from './sqljs';
 import migration001 from '../../../database/migrations/001_initial.sql?raw';
+import migration002 from '../../../database/migrations/002_production.sql?raw';
 import { nowIso } from '@/core/utils/date';
 
 interface Migration {
@@ -16,6 +17,11 @@ export const MIGRATIONS: Migration[] = [
     version: 1,
     name: 'initial',
     sql: migration001,
+  },
+  {
+    version: 2,
+    name: 'production',
+    sql: migration002,
   },
 ];
 

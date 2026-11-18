@@ -10,6 +10,11 @@ import type {
   StorePlatform,
   StoreStatus,
 } from '@/types/entities';
+import type {
+  ProductionPriority,
+  ProductionStage,
+  WorkOrderStatus,
+} from '@/types/production';
 
 export type BadgeTone = 'neutral' | 'primary' | 'success' | 'warning' | 'danger' | 'info';
 
@@ -59,6 +64,52 @@ export const ORDER_STATUS_TONES: Record<OrderStatus, BadgeTone> = {
   cancelled: 'neutral',
   returned: 'danger',
   refunded: 'danger',
+};
+
+export const PRODUCTION_STAGE_LABELS: Record<ProductionStage, string> = {
+  antrian: 'Antrian',
+  potong: 'Potong',
+  jahit: 'Jahit',
+  finishing: 'Finishing',
+  qc: 'QC',
+  packing: 'Packing',
+  selesai: 'Selesai',
+};
+
+export const PRODUCTION_STAGE_TONES: Record<ProductionStage, BadgeTone> = {
+  antrian: 'neutral',
+  potong: 'info',
+  jahit: 'info',
+  finishing: 'primary',
+  qc: 'warning',
+  packing: 'warning',
+  selesai: 'success',
+};
+
+export const PRODUCTION_PRIORITY_LABELS: Record<ProductionPriority, string> = {
+  low: 'Rendah',
+  normal: 'Normal',
+  high: 'Tinggi',
+  urgent: 'Mendesak',
+};
+
+export const PRODUCTION_PRIORITY_TONES: Record<ProductionPriority, BadgeTone> = {
+  low: 'neutral',
+  normal: 'info',
+  high: 'warning',
+  urgent: 'danger',
+};
+
+export const WORK_ORDER_STATUS_LABELS: Record<WorkOrderStatus, string> = {
+  active: 'Berjalan',
+  done: 'Selesai',
+  cancelled: 'Dibatalkan',
+};
+
+export const WORK_ORDER_STATUS_TONES: Record<WorkOrderStatus, BadgeTone> = {
+  active: 'info',
+  done: 'success',
+  cancelled: 'neutral',
 };
 
 export const FEE_TYPE_LABELS: Record<FeeType, string> = {

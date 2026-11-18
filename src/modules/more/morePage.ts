@@ -32,6 +32,13 @@ const MAIN_LINKS: MoreLink[] = [
     iconName: 'upload',
   },
   {
+    href: '/production',
+    label: 'Produksi',
+    description:
+      'Work order dari item pesanan atau manual, progres tahap, PIC, tenggat, lolos, dan cacat.',
+    iconName: 'factory',
+  },
+  {
     href: '/products',
     label: 'Produk & HPP',
     description: 'Produk, harga jual, dan riwayat HPP untuk perhitungan laba yang konsisten.',

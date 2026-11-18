@@ -262,6 +262,50 @@ describe('backup and restore', () => {
     expect(sensitive.bankAccount).toBe('111222333');
   });
 
+  it('restores production work orders and stage history', async () => {
+    const source = await createTestContext();
+    const workOrder = await source.services.productionService.create({
+      productName: 'Kaos Backup',
+      sku: 'BKP-01',
+      qty: 6,
+      priority: 'high',
+    });
+    await source.services.productionService.advance(workOrder.id, {
+      qtyPassed: 5,
+      qtyDefect: 1,
+      picName: 'Bu Ani',
+    });
+    const password = 'kata-sandi-backup';
+    const file = await makeBackup(source, password);
+
+    const target = await createTestContext();
+    const inspection = await target.services.backupService.inspectBackup(file, password);
+    expect(inspection.tableCounts.work_orders).toBe(1);
+    expect(inspection.tableCounts.work_order_stages).toBe(1);
+
+    await target.services.backupService.restoreBackup(file, password);
+    const list = await target.services.productionService.list({ status: 'all' });
+    expect(list.items).toHaveLength(1);
+    expect(list.items[0]).toMatchObject({
+      code: workOrder.code,
+      productName: 'Kaos Backup',
+      qty: 6,
+      priority: 'high',
+      currentStage: 'potong',
+      qtyPassed: 5,
+      qtyDefect: 1,
+    });
+    const detail = await target.services.productionService.get(list.items[0]!.id);
+    expect(detail.stages).toHaveLength(1);
+    expect(detail.stages[0]).toMatchObject({
+      stage: 'antrian',
+      qtyIn: 6,
+      qtyPassed: 5,
+      qtyDefect: 1,
+      picName: 'Bu Ani',
+    });
+  });
+
   it('rejects backups with incomplete tables', async () => {
     const { services } = await createTestContext();
     const envelope = await createBackupEnvelope(

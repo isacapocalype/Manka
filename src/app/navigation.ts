@@ -30,6 +30,13 @@ export const MAIN_NAV: NavItem[] = [
     section: 'main',
   },
   {
+    href: '/production',
+    label: 'Produksi',
+    iconName: 'factory',
+    match: ['/production'],
+    section: 'main',
+  },
+  {
     href: '/products',
     label: 'Produk',
     iconName: 'package',
@@ -140,7 +147,7 @@ export const MOBILE_NAV: NavItem[] = [
     href: '/more',
     label: 'Lainnya',
     iconName: 'menu',
-    match: ['/more', '/stores', '/reports', '/health', '/settings'],
+    match: ['/more', '/stores', '/reports', '/production', '/health', '/settings'],
   },
 ];
 
@@ -152,6 +159,7 @@ export function activeMainHref(path: string): string {
   if (path.startsWith('/finance')) return '/finance';
   if (path.startsWith('/stores')) return '/stores';
   if (path.startsWith('/orders')) return '/orders';
+  if (path.startsWith('/production')) return '/production';
   if (path.startsWith('/products')) return '/products';
   if (path.startsWith('/reports')) return '/reports';
   if (path.startsWith('/health')) return '/more';

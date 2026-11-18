@@ -13,6 +13,7 @@ import { SettlementRepository } from '@/core/repositories/settlementRepository';
 import { ImportRepository } from '@/core/repositories/importRepository';
 import { SettingsRepository } from '@/core/repositories/settingsRepository';
 import { BackupRepository } from '@/core/repositories/backupRepository';
+import { WorkOrderRepository } from '@/core/repositories/workOrderRepository';
 import { StoreService } from './storeService';
 import { ProductService } from './productService';
 import { OrderService } from './orderService';
@@ -28,6 +29,7 @@ import { DashboardService } from './dashboardService';
 import { ReportService } from './reportService';
 import { ProductProfitService } from './productProfitService';
 import { DataHealthService } from './dataHealthService';
+import { ProductionService } from './productionService';
 
 export interface AppServices {
   db: Database;
@@ -44,6 +46,7 @@ export interface AppServices {
   imports: ImportRepository;
   settings: SettingsRepository;
   backupRepo: BackupRepository;
+  workOrders: WorkOrderRepository;
   storeService: StoreService;
   productService: ProductService;
   orderService: OrderService;
@@ -59,6 +62,7 @@ export interface AppServices {
   reportService: ReportService;
   productProfitService: ProductProfitService;
   dataHealthService: DataHealthService;
+  productionService: ProductionService;
 }
 
 export function createAppServices(
@@ -78,6 +82,7 @@ export function createAppServices(
   const imports = new ImportRepository(db);
   const settings = new SettingsRepository(db);
   const backupRepo = new BackupRepository(db);
+  const workOrders = new WorkOrderRepository(db);
 
   const storeService = new StoreService(stores, audit, encryption);
   const productService = new ProductService(db, products, audit);
@@ -110,6 +115,7 @@ export function createAppServices(
   const productProfitService = new ProductProfitService(orders, fees, refunds);
   const reportService = new ReportService(financeService, stores, productProfitService);
   const dataHealthService = new DataHealthService(orders, products, settlements, settings);
+  const productionService = new ProductionService(workOrders, orders, audit);
 
   return {
     db,
@@ -126,6 +132,7 @@ export function createAppServices(
     imports,
     settings,
     backupRepo,
+    workOrders,
     storeService,
     productService,
     orderService,
@@ -141,6 +148,7 @@ export function createAppServices(
     reportService,
     productProfitService,
     dataHealthService,
+    productionService,
   };
 }
 

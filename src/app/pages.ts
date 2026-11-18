@@ -10,6 +10,9 @@ import { orderListPage } from '@/modules/orders/orderListPage';
 import { orderDetailPage } from '@/modules/orders/orderDetailPage';
 import { orderFormPage } from '@/modules/orders/orderFormPage';
 import { orderImportPage } from '@/modules/orders/orderImportPage';
+import { productionListPage } from '@/modules/production/productionListPage';
+import { productionFormPage } from '@/modules/production/productionFormPage';
+import { productionDetailPage } from '@/modules/production/productionDetailPage';
 import { financeOverviewPage } from '@/modules/finance/financeOverviewPage';
 import { feeListPage, feeFormPage } from '@/modules/finance/feePages';
 import {
@@ -45,6 +48,10 @@ export const APP_ROUTES: RouteDefinition[] = [
   { path: '/orders/import', title: 'Import pesanan', render: orderImportPage },
   { path: '/orders/:id', title: 'Detail pesanan', render: orderDetailPage },
   { path: '/orders/:id/edit', title: 'Ubah pesanan', render: orderFormPage },
+
+  { path: '/production', title: 'Produksi', render: productionListPage },
+  { path: '/production/new', title: 'Work order baru', render: productionFormPage },
+  { path: '/production/:id', title: 'Detail work order', render: productionDetailPage },
 
   { path: '/finance', title: 'Keuangan', render: financeOverviewPage },
 

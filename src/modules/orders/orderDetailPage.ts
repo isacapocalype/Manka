@@ -21,6 +21,7 @@ import {
   showToast,
 } from '@/components/ui/ui';
 import { renderPageError } from '@/app/pageUtils';
+import { stageBadge } from '@/modules/production/productionUi';
 
 export const orderDetailPage: PageRenderer = async (context) => {
   const { root, services } = context;
@@ -28,16 +29,68 @@ export const orderDetailPage: PageRenderer = async (context) => {
   root.innerHTML = loadingBlock('Memuat pesanan…');
 
   try {
-    const order = await services.orderService.getDetail(id);
+    const [order, workOrders] = await Promise.all([
+      services.orderService.getDetail(id),
+      services.productionService.listByOrder(id),
+    ]);
     if (context.signal.aborted) return;
     context.setTitle(order.marketplaceOrderId);
 
     const revenue = isRevenueOrderStatus(order.status);
+    const productionBlocked = !revenue;
     const activeRefundQuantity = order.refunds
       .filter((refund) => refund.status !== 'rejected')
       .reduce((total, refund) => total + refund.quantity, 0);
     const totalQuantity = order.items.reduce((total, item) => total + item.quantity, 0);
     const canDelete = order.refunds.length === 0;
+
+    const scheduledByItem = new Map<string, number>();
+    for (const workOrder of workOrders) {
+      if (!workOrder.orderItemId || workOrder.status === 'cancelled') continue;
+      scheduledByItem.set(
+        workOrder.orderItemId,
+        (scheduledByItem.get(workOrder.orderItemId) ?? 0) + workOrder.qty,
+      );
+    }
+    const workOrdersByItem = new Map<string, typeof workOrders>();
+    for (const workOrder of workOrders) {
+      if (!workOrder.orderItemId) continue;
+      const existing = workOrdersByItem.get(workOrder.orderItemId) ?? [];
+      existing.push(workOrder);
+      workOrdersByItem.set(workOrder.orderItemId, existing);
+    }
+    const productionRows = order.items.map((item) => {
+      const itemWorkOrders = workOrdersByItem.get(item.id) ?? [];
+      const scheduled = scheduledByItem.get(item.id) ?? 0;
+      const remaining = Math.max(0, item.quantity - scheduled);
+      const workOrderLinks =
+        itemWorkOrders.length > 0
+          ? `<div class="production-links">${itemWorkOrders
+              .map(
+                (workOrder) =>
+                  `<a class="table-link" href="#/production/${workOrder.id}"><code>${escapeHtml(workOrder.code)}</code></a>${stageBadge(workOrder.currentStage)}`,
+              )
+              .join('')}</div>`
+          : '<span class="muted">Belum ada</span>';
+      const action =
+        remaining <= 0
+          ? badge('Terjadwal penuh', 'success')
+          : productionBlocked
+            ? '<span class="muted">Tidak tersedia</span>'
+            : `<a class="btn btn-secondary btn-sm" href="#/production/new?orderId=${encodeURIComponent(order.id)}&orderItemId=${encodeURIComponent(item.id)}">${icon('plus')}<span>Buat WO</span></a>`;
+      return [
+        `<span class="table-strong">${escapeHtml(item.productName)}</span>${
+          item.sku ? `<span class="table-sub">${escapeHtml(item.sku)}</span>` : ''
+        }`,
+        formatNumber(item.quantity),
+        formatNumber(scheduled),
+        remaining > 0
+          ? `<strong class="${productionBlocked ? '' : 'value-negative'}">${formatNumber(remaining)}</strong>`
+          : '0',
+        workOrderLinks,
+        action,
+      ];
+    });
 
     root.innerHTML = `
       ${pageHeader({
@@ -139,6 +192,27 @@ export const orderDetailPage: PageRenderer = async (context) => {
             formatRupiah(item.quantity * item.hppSnapshot),
           ]),
         ),
+      })}
+
+      ${card({
+        title: 'Produksi',
+        subtitle:
+          workOrders.length > 0
+            ? `${formatNumber(workOrders.length)} work order terhubung ke pesanan ini. Perubahan status pesanan tidak mengubah progres produksi.`
+            : 'Buat work order per item untuk memantau tahap produksi, PIC, tenggat, lolos, dan cacat.',
+        actions: linkButton('/production', 'Semua produksi', 'btn btn-ghost btn-sm', 'factory'),
+        padded: false,
+        body: `
+          ${
+            productionBlocked
+              ? `<p class="inline-note note-warning production-inline-note">${icon('triangle-alert')} Pesanan berstatus batal, retur, atau refund tidak dapat dibuatkan work order baru. Work order lama tetap dapat dilihat.</p>`
+              : ''
+          }
+          ${dataTable(
+            ['Produk', 'Dipesan', 'Terjadwal', 'Sisa', 'Work order', ''],
+            productionRows,
+          )}
+        `,
       })}
 
       <div class="detail-grid">
