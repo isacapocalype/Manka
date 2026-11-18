@@ -3,7 +3,27 @@ import type { DataCounts } from '@/types/entities';
 
 export interface BackupTableDefinition {
   name: string;
+  /** Versi skema saat tabel ini pertama kali dibuat. Default 1. */
+  since?: number;
   columns: readonly string[];
+  /** Kolom yang baru ditambahkan setelah versi 1, beserta versi skemanya. */
+  columnSince?: Readonly<Record<string, number>>;
+}
+
+export function isBackupTableInVersion(
+  table: BackupTableDefinition,
+  schemaVersion: number,
+): boolean {
+  return (table.since ?? 1) <= schemaVersion;
+}
+
+export function backupTableColumns(
+  table: BackupTableDefinition,
+  schemaVersion: number,
+): string[] {
+  return table.columns.filter(
+    (column) => (table.columnSince?.[column] ?? 1) <= schemaVersion,
+  );
 }
 
 /** Urutan induk → anak untuk insert restore. */
@@ -207,7 +227,10 @@ export class BackupRepository {
     return tables;
   }
 
-  async restoreAll(tables: Record<string, SqlRow[]>): Promise<void> {
+  async restoreAll(
+    tables: Record<string, SqlRow[]>,
+    schemaVersion: number,
+  ): Promise<void> {
     const clearOrder = [...BACKUP_TABLES].reverse();
     await this.db.transaction(async (tx) => {
       for (const table of clearOrder) {
@@ -216,10 +239,20 @@ export class BackupRepository {
       for (const table of BACKUP_TABLES) {
         const rows = tables[table.name];
         if (!rows || rows.length === 0) continue;
+        if (!isBackupTableInVersion(table, schemaVersion)) {
+          throw new Error(
+            `Tabel ${table.name} tidak dikenal pada skema backup versi ${schemaVersion}.`,
+          );
+        }
+        const columns = backupTableColumns(table, schemaVersion);
         for (const row of rows) {
-          const columns = table.columns.filter((column) => Object.prototype.hasOwnProperty.call(row, column));
-          if (columns.length !== table.columns.length) {
-            throw new Error(`Data backup untuk tabel ${table.name} tidak lengkap.`);
+          const missing = columns.filter(
+            (column) => !Object.prototype.hasOwnProperty.call(row, column),
+          );
+          if (missing.length > 0) {
+            throw new Error(
+              `Data backup untuk tabel ${table.name} tidak lengkap: ${missing.join(', ')}.`,
+            );
           }
           const placeholders = columns.map(() => '?').join(', ');
           const values = columns.map((column) => {

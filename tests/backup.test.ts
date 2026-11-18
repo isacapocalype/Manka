@@ -5,7 +5,13 @@ import {
   type BackupEnvelope,
 } from '@/core/crypto/encryption';
 import { LATEST_SCHEMA_VERSION } from '@/core/database';
+import type { SqlRow } from '@/core/database/types';
 import { APP_VERSION } from '@/core/services/backupService';
+import {
+  BACKUP_TABLES,
+  backupTableColumns,
+  isBackupTableInVersion,
+} from '@/core/repositories/backupRepository';
 
 async function makeBackup(
   context: Awaited<ReturnType<typeof createTestContext>>,
@@ -26,6 +32,42 @@ async function makeBackup(
     createdAt,
   );
   return new File([JSON.stringify(envelope, null, 2)], 'manka-backup.manka', {
+    type: 'application/json',
+  });
+}
+
+async function makeBackupAtVersion(
+  context: Awaited<ReturnType<typeof createTestContext>>,
+  password: string,
+  schemaVersion: number,
+): Promise<File> {
+  const currentTables = await context.services.backupRepo.readAll();
+  const tables: Record<string, SqlRow[]> = {};
+  for (const table of BACKUP_TABLES) {
+    if (!isBackupTableInVersion(table, schemaVersion)) continue;
+    const columns = backupTableColumns(table, schemaVersion);
+    tables[table.name] = (currentTables[table.name] ?? []).map((row) => {
+      const filtered: SqlRow = {};
+      for (const column of columns) {
+        filtered[column] = row[column] ?? null;
+      }
+      return filtered;
+    });
+  }
+  const encryptionKey = await context.services.encryption.exportKeyBase64();
+  const createdAt = '2026-02-10T10:00:00.000Z';
+  const envelope = await createBackupEnvelope(
+    JSON.stringify({
+      schemaVersion,
+      appVersion: APP_VERSION,
+      createdAt,
+      encryptionKey,
+      tables,
+    }),
+    password,
+    createdAt,
+  );
+  return new File([JSON.stringify(envelope, null, 2)], 'manka-backup-lama.manka', {
     type: 'application/json',
   });
 }
@@ -194,6 +236,30 @@ describe('backup and restore', () => {
     );
     expect(detail.items[0]?.hppSnapshot).toBe(55_000);
     expect(detail.netSales).toBe(295_000);
+  });
+
+  it('restores a backup created with the original schema version', async () => {
+    const source = await createTestContext();
+    await source.services.storeService.create({
+      name: 'Toko Lama',
+      platform: 'tiktok',
+      password: 'sandi-lama',
+      bankAccount: '111222333',
+    });
+    const password = 'kata-sandi-backup';
+    const file = await makeBackupAtVersion(source, password, 1);
+
+    const target = await createTestContext();
+    const inspection = await target.services.backupService.inspectBackup(file, password);
+    expect(inspection.schemaVersion).toBe(1);
+    expect(inspection.tableCounts.stores).toBe(1);
+
+    await target.services.backupService.restoreBackup(file, password);
+    const stores = await target.services.stores.listAll();
+    expect(stores.map((store) => store.name)).toContain('Toko Lama');
+    const sensitive = await target.services.storeService.getSensitiveData(stores[0]!.id);
+    expect(sensitive.password).toBe('sandi-lama');
+    expect(sensitive.bankAccount).toBe('111222333');
   });
 
   it('rejects backups with incomplete tables', async () => {

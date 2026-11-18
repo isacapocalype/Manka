@@ -93,7 +93,7 @@ export function createAppServices(
     imports,
     audit,
   );
-  const backupService = new BackupService(backupRepo, encryption, audit);
+  const backupService = new BackupService(backupRepo, encryption, audit, settings);
   const financeService = new FinancialService(
     orders,
     fees,
