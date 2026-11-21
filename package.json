@@ -5,6 +5,7 @@
   "productName": "Manka",
   "desktopName": "manka.desktop",
   "description": "Manka - Konveksi Business Manager (offline-first Android, browser, dan Linux)",
+  "homepage": "https://github.com/isacapocalype/Manka",
   "author": "Manka",
   "license": "UNLICENSED",
   "type": "module",
@@ -21,7 +22,10 @@
     "android:build": "npm run build && cap sync android && cd android && ./gradlew assembleDebug",
     "linux:run": "npm run build && electron .",
     "linux:build": "npm run build && electron-builder --linux AppImage --x64 --publish never",
-    "linux:pack": "electron-builder --linux AppImage --x64 --publish never"
+    "linux:pack": "electron-builder --linux AppImage --x64 --publish never",
+    "linux:deb": "npm run build && electron-builder --linux deb --x64 --publish never",
+    "linux:pack:deb": "electron-builder --linux deb --x64 --publish never",
+    "linux:packages": "npm run build && electron-builder --linux --x64 --publish never"
   },
   "dependencies": {
     "@capacitor-community/sqlite": "^8.1.1",
@@ -74,6 +78,12 @@
           "arch": [
             "x64"
           ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "executableName": "manka",
@@ -84,6 +94,10 @@
       "synopsis": "Manajemen bisnis konveksi offline-first",
       "description": "Manka menyimpan data toko, pesanan, produk, dan keuangan secara lokal tanpa server.",
       "maintainer": "Manka"
+    },
+    "deb": {
+      "recommends": [],
+      "artifactName": "manka_${version}_${arch}.${ext}"
     }
   }
 }

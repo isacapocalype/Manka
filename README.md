@@ -1,6 +1,6 @@
 # Manka — Konveksi Business Manager
 
-Aplikasi manajemen bisnis konveksi yang **offline-first**, tanpa backend, tanpa cloud, dan tanpa login. Seluruh data transaksi tersimpan di perangkat. Dibangun sebagai SPA TypeScript/Vite untuk browser, dibungkus Capacitor untuk Android dengan SQLite native, dan dibungkus Electron untuk Linux sebagai AppImage dengan `sql.js` + IndexedDB.
+Aplikasi manajemen bisnis konveksi yang **offline-first**, tanpa backend, tanpa cloud, dan tanpa login. Seluruh data transaksi tersimpan di perangkat. Dibangun sebagai SPA TypeScript/Vite untuk browser, dibungkus Capacitor untuk Android dengan SQLite native, dan dibungkus Electron untuk Linux sebagai paket Debian (`.deb`) atau AppImage dengan `sql.js` + IndexedDB.
 
 Dokumen sumber:
 
@@ -22,7 +22,7 @@ Dokumen sumber:
 - **Backup/restore** — snapshot logis seluruh data + kunci enkripsi, dibungkus password, dapat disalin keluar aplikasi.
 - **Audit log** — mencatat perubahan data penting dan akses data sensitif tanpa menyimpan nilainya.
 - **Responsif** — sidebar desktop dan bottom navigation mobile.
-- **Linux** — AppImage x86_64 mandiri untuk CachyOS/Arch dan distro glibc lain; data lokal di direktori konfigurasi pengguna.
+- **Linux** — paket `.deb` x86_64 untuk Debian/Ubuntu atau AppImage x86_64 mandiri untuk distro glibc lain; data lokal di direktori konfigurasi pengguna.
 
 ## Stack
 
@@ -33,7 +33,7 @@ Dokumen sumber:
 | Database browser & Linux | `sql.js` (SQLite WASM), byte database disimpan di IndexedDB |
 | Database Android | `@capacitor-community/sqlite` |
 | Android shell | Capacitor 8 |
-| Linux shell | Electron 45.3.3, AppImage x86_64 |
+| Linux shell | Electron 45.3.3, paket `.deb` dan AppImage x86_64 |
 | Enkripsi | Web Crypto AES-GCM 256, kunci acak per perangkat via Capacitor Preferences |
 | Ekspor | ExcelJS, jsPDF + autotable |
 | Grafik | Chart.js |
@@ -89,20 +89,25 @@ Konfigurasi Android:
 
 Build debug sudah diverifikasi dengan JDK 21 dan Android SDK 36: `npx cap sync android` dan `./gradlew assembleDebug` berhasil menghasilkan `app-debug.apk`. APK ditandatangani dengan debug key, bukan untuk Play Store, dan diterbitkan sebagai GitHub Release (prerelease).
 
-## Build Linux (AppImage)
+## Build Linux (AppImage dan Debian)
 
-Target Linux resmi hanya **AppImage x86_64** untuk CachyOS/Arch dan distro glibc lain. Tidak ada paket pacman, deb, atau instalasi sistem; aplikasi berjalan langsung dari satu file dan tidak membutuhkan akses root.
+Target Linux resmi adalah **AppImage x86_64** untuk CachyOS/Arch dan distro glibc lain, serta paket **`.deb` amd64/x86_64** untuk Debian/Ubuntu. AppImage berjalan langsung dari satu file tanpa akses root; paket `.deb` terintegrasi dengan `apt` dan membutuhkan akses root saat pemasangan. Tidak ada paket pacman, penandatanganan GPG, atau build ARM.
 
-Prasyarat: Node.js `^20.19.0` atau `>=22.12.0`, npm, dan koneksi internet saat build untuk mengunduh Electron serta toolset AppImage. Build tidak memerlukan `libfuse2`.
+Prasyarat: Node.js `^20.19.0` atau `>=22.12.0`, npm, dan koneksi internet saat build untuk mengunduh Electron, toolset AppImage, dan `fpm`. Build tidak memerlukan `libfuse2`. Di CachyOS/Arch, build `.deb` memerlukan `libcrypt.so.1` dari paket `libxcrypt-compat`; pada Debian/Ubuntu dependensi ini sudah tersedia.
 
 ```bash
 npm install
-npm run linux:build
+npm run linux:build     # AppImage saja
+npm run linux:deb       # paket .deb saja
+npm run linux:packages  # keduanya
 ```
 
-Hasil: `release/Manka-1.0.1-x86_64.AppImage` (nama mengikuti versi di `package.json`).
+Hasil (nama mengikuti versi di `package.json`):
 
-Menjalankan:
+- `release/Manka-1.0.1-x86_64.AppImage`
+- `release/manka_1.0.1_amd64.deb`
+
+### Menjalankan AppImage
 
 ```bash
 chmod +x release/Manka-1.0.1-x86_64.AppImage
@@ -115,11 +120,29 @@ AppImage dapat juga dibuka lewat file manager setelah diberi izin eksekusi. Runt
 APPIMAGE_EXTRACT_AND_RUN=1 ./release/Manka-1.0.1-x86_64.AppImage
 ```
 
+### Memasang paket Debian
+
+Dari hasil build lokal atau file yang diunduh dari GitHub Release:
+
+```bash
+sudo apt install ./release/manka_1.0.1_amd64.deb
+manka
+```
+
+Paket memasang aplikasi di `/opt/Manka`, membuat tautan `/usr/bin/manka`, serta entri desktop dan ikon. Dependensi Electron dipasang otomatis dari repositori distro; paket tidak menyertakan `libappindicator` yang sudah usang. Untuk menghapus:
+
+```bash
+sudo apt remove manka
+```
+
+Data di `~/.config/Manka` tidak dihapus oleh perintah tersebut. Paket tidak ditandatangani GPG, jadi unduh hanya dari GitHub Release dan cocokkan `SHA256SUMS` bila tersedia.
+
 Perintah pengembangan:
 
 ```bash
-npm run linux:run   # build web + jalankan Electron dari source
-npm run linux:pack  # bungkus ulang tanpa build web
+npm run linux:run        # build web + jalankan Electron dari source
+npm run linux:pack       # bungkus ulang AppImage tanpa build web
+npm run linux:pack:deb   # bungkus ulang .deb tanpa build web
 ```
 
 Penyimpanan Linux:
@@ -134,9 +157,16 @@ Penyimpanan Linux:
 
 AppImage `v1.0.1` sudah diuji langsung di CachyOS x86_64 tanpa `libfuse2`: aplikasi terbuka, navigasi **Tambah toko** berfungsi, data toko tersimpan, data tetap ada setelah aplikasi ditutup dan dibuka kembali, serta backup `.manka` dapat diekspor dan dipulihkan.
 
+Paket `.deb` dibangun dari sumber yang sama. Workflow Ubuntu memeriksa metadata dengan `dpkg-deb`, memasang paket dengan `apt-get install ./release/*.deb`, lalu memastikan binary, tautan `/usr/bin/manka`, dan entri desktop tersedia. Arsip paket juga dapat diperiksa manual:
+
+```bash
+dpkg-deb --info release/manka_1.0.1_amd64.deb
+dpkg-deb --contents release/manka_1.0.1_amd64.deb
+```
+
 ### Pindah data Android ↔ Linux
 
-Kedua build memakai skema database dan format backup yang sama:
+Semua build memakai skema database dan format backup yang sama:
 
 1. Di perangkat asal buka **Pengaturan → Backup**, buat file `.manka`, lalu simpan ke penyimpanan yang dapat dipindahkan.
 2. Pindahkan file ke perangkat tujuan.
@@ -267,8 +297,8 @@ src/styles/                CSS responsif dan token desain
 tests/                     Test Vitest dengan database sql.js asli
 android/                   Proyek Capacitor Android
 electron/                  Proses utama Electron (protokol manka://, jendela, unduhan)
-build/                     Ikon aplikasi untuk Electron/AppImage
-release/                   Hasil build AppImage (tidak di-commit)
+build/                     Ikon aplikasi untuk Electron, AppImage, dan paket .deb
+release/                   Hasil build AppImage dan paket .deb (tidak di-commit)
 ```
 
 Routing memakai hash (`#/...`) agar kompatibel dengan WebView tanpa server. Rute statis seperti `#/orders/new` didaftarkan sebelum rute `:id`.
@@ -289,13 +319,14 @@ npm test
 npm run build
 npx cap sync android
 npm run linux:build
+npm run linux:deb
 ```
 
 ## Batasan yang Diketahui
 
 - APK debug sudah dapat dibangun dan diterbitkan; verifikasi runtime database SQLite native masih terbatas pada emulator, belum perangkat fisik.
 - Adapter web dan alur aplikasi diuji di Chromium; shell Electron dan AppImage diuji langsung di CachyOS x86_64.
-- Build Linux hanya menyediakan AppImage x86_64; tidak ada paket instalasi sistem atau build ARM.
+- Build Linux menyediakan AppImage dan paket `.deb` x86_64; tidak ada paket pacman, penandatanganan GPG, atau build ARM. Paket `.deb` ditujukan Debian/Ubuntu dengan dependensi Electron yang tersedia di repositori distro.
 - Backup memuat kunci enkripsi, sehingga keamanan file sepenuhnya bergantung pada kekuatan kata sandi backup.
 - Aplikasi tidak menyediakan sinkronisasi antarperangkat; pindahkan data hanya melalui backup/restore.
 - BOM tidak melacak stok material dan tidak membuat jurnal persediaan; biaya material dihitung langsung dari biaya satuan aktif.

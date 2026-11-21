@@ -1,0 +1,120 @@
+name: Build Linux Debian Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag GitHub Release (mis. v1.0.1-debian)'
+        required: true
+        default: 'v1.0.1-debian'
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: linux-deb-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Debian package
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build Debian package
+        run: npm run linux:deb
+
+      - name: Verify Debian package
+        run: |
+          DEB=$(find release -maxdepth 1 -name 'manka_*_amd64.deb' -print -quit)
+          test -n "$DEB"
+          test -f "$DEB"
+          echo "artifact=$DEB"
+          dpkg-deb --info "$DEB"
+          test "$(dpkg-deb -f "$DEB" Package)" = "manka"
+          test "$(dpkg-deb -f "$DEB" Version)" = "1.0.1"
+          test "$(dpkg-deb -f "$DEB" Architecture)" = "amd64"
+          dpkg-deb --contents "$DEB" | grep -q '\./opt/Manka/manka$'
+          dpkg-deb --contents "$DEB" | grep -q '\./usr/share/applications/manka.desktop$'
+          dpkg-deb --contents "$DEB" | grep -q '\./usr/share/icons/hicolor/1024x1024/apps/manka.png$'
+          if dpkg-deb -f "$DEB" Depends | grep -q 'libappindicator'; then
+            echo "Paket .deb masih bergantung pada libappindicator yang sudah usang." >&2
+            exit 1
+          fi
+
+      - name: Install Debian package
+        run: |
+          sudo apt-get update
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y ./release/*.deb
+          dpkg -s manka | grep -q '^Status: install ok installed$'
+          test -x /usr/bin/manka
+          test "$(readlink -f /usr/bin/manka)" = "/opt/Manka/manka"
+          test -f /usr/share/applications/manka.desktop
+          dpkg -L manka | grep -q '^/usr/share/applications/manka.desktop$'
+
+      - name: Create checksum
+        run: |
+          DEB=$(find release -maxdepth 1 -name 'manka_*_amd64.deb' -print -quit)
+          cd release
+          sha256sum "$(basename "$DEB")" > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Upload Debian package artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: manka-linux-deb
+          path: |
+            release/manka_*_amd64.deb
+            release/SHA256SUMS
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ inputs.tag }}
+          name: Manka ${{ inputs.tag }} (Linux Debian)
+          body: |
+            Manka untuk Debian/Ubuntu x86_64 — paket `.deb`, data lokal, tanpa server.
+
+            ```bash
+            sudo apt install ./manka_1.0.1_amd64.deb
+            ```
+
+            Untuk menghapus:
+
+            ```bash
+            sudo apt remove manka
+            ```
+
+            - Binary dipasang di `/opt/Manka` dan tautan tersedia sebagai `manka`.
+            - Data tersimpan di `~/.config/Manka` (atau `$XDG_CONFIG_HOME/Manka`).
+            - Backup/restore `.manka` kompatibel dengan build Android dan AppImage.
+            - Tidak memerlukan FUSE atau `libfuse2`.
+
+            Verifikasi unduhan:
+
+            ```bash
+            sha256sum -c SHA256SUMS
+            ```
+          files: |
+            release/manka_*_amd64.deb
+            release/SHA256SUMS
+          fail_on_unmatched_files: true
+          prerelease: true
